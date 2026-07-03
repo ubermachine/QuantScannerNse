@@ -1,0 +1,391 @@
+<div class="min-h-screen bg-[#080c14] text-slate-100 flex flex-col">
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-900 bg-[#090d16]/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">QUANT SCANNER</h1>
+        <p class="text-xs text-slate-500 font-medium tracking-wider">JUSTNIFTY STRATEGY PLATFORM</p>
+      </div>
+    </div>
+
+    <!-- Index Regime Status Indicator -->
+    <div class="flex items-center gap-4">
+      <div *ngIf="scanResponse" class="flex items-center gap-3 bg-slate-900/60 border border-slate-800/80 px-4 py-2 rounded-xl text-sm">
+        <span class="text-slate-400">NIFTY 50:</span>
+        <span class="font-bold text-white">{{ scanResponse.indexClose | number:'1.2-2' }}</span>
+        <div class="h-1.5 w-1.5 rounded-full" [ngClass]="scanResponse.marketRegime === 'BULLISH' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-pulse'"></div>
+        <span class="font-bold text-xs px-2 py-0.5 rounded-md" 
+              [ngClass]="scanResponse.marketRegime === 'BULLISH' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/50' : 'bg-amber-950/40 text-amber-400 border border-amber-900/50'">
+          {{ scanResponse.marketRegime }} REGIME
+        </span>
+      </div>
+
+      <!-- Sync DB Controls -->
+      <button *ngIf="!syncStatus?.isRunning" (click)="startSync()" class="text-xs bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-medium px-3.5 py-2 rounded-xl transition flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18" />
+        </svg>
+        Sync Cache
+      </button>
+
+      <!-- Scan Trigger Button -->
+      <button (click)="runScan()" [disabled]="isScanning" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-blue-600/10">
+        <svg *ngIf="isScanning" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>{{ isScanning ? 'Scanning...' : 'Scan Universe' }}</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Market Regime Risk Warning Flag -->
+  <div *ngIf="scanResponse?.marketRegime === 'BEARISH'" class="bg-amber-950/20 border-b border-amber-900/40 px-6 py-2.5 text-xs text-amber-300 flex items-center gap-2">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    <span><strong>System Alert:</strong> Defensive regime active (Index < 200 DMA). Positional long trades have lower historical win-rates. Reduce capital allocations or hold high cash levels.</span>
+  </div>
+
+  <!-- DB Sync Background Progress Indicator Bar -->
+  <div *ngIf="syncStatus?.isRunning" class="bg-blue-950/20 border-b border-blue-900/40 px-6 py-3 flex items-center justify-between text-xs text-blue-300">
+    <div class="flex items-center gap-3 w-2/3">
+      <svg class="animate-spin h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <div class="w-full">
+        <div class="flex justify-between font-semibold mb-1">
+          <span>Syncing Database Cache (Yahoo Finance)...</span>
+          <span>{{ syncStatus?.progressPercent }}%</span>
+        </div>
+        <div class="w-full bg-slate-900 rounded-full h-1.5 border border-slate-800">
+          <div class="bg-blue-500 h-1.5 rounded-full transition-all duration-300" [style.width.%]="syncStatus?.progressPercent"></div>
+        </div>
+      </div>
+    </div>
+    <span class="font-medium text-slate-400">Current Ticker: <span class="text-blue-400 font-bold">{{ syncStatus?.currentTicker }}</span></span>
+  </div>
+
+  <!-- Main Grid Workspace -->
+  <main class="flex-1 p-6 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start overflow-hidden">
+    
+    <!-- Left Workspace Column: Dashboard Console & Table (Col span 7) -->
+    <div class="xl:col-span-7 flex flex-col gap-6 h-full">
+      
+      <!-- Control Filtering Console -->
+      <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-xl">
+        <!-- Search field -->
+        <div class="relative w-full md:w-80">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input type="text" 
+                 [(ngModel)]="searchTerm" 
+                 (ngModelChange)="onSearchChange()" 
+                 placeholder="Search by Ticker, Name, Sector..." 
+                 class="w-full pl-10 pr-4 py-2 text-sm bg-slate-950/80 border border-slate-800/80 rounded-xl focus:outline-none focus:border-blue-600 text-slate-200 placeholder-slate-500 transition" />
+        </div>
+
+        <!-- Strategy Tabs selection -->
+        <div class="flex bg-slate-950/80 border border-slate-800/60 p-1 rounded-xl w-full md:w-auto">
+          <button (click)="changeTab('all')" 
+                  class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
+                  [ngClass]="activeTab === 'all' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+            All
+          </button>
+          <button (click)="changeTab('hct')" 
+                  class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
+                  [ngClass]="activeTab === 'hct' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+            HCT Setup
+          </button>
+          <button (click)="changeTab('lrhr')" 
+                  class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
+                  [ngClass]="activeTab === 'lrhr' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+            LRHR Value
+          </button>
+          <button (click)="changeTab('watchlist')" 
+                  class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
+                  [ngClass]="activeTab === 'watchlist' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+            Watchlist
+          </button>
+        </div>
+      </div>
+
+      <!-- Scans Results Table Card -->
+      <div class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl flex-1 flex flex-col max-h-[700px]">
+        <div class="overflow-y-auto flex-1">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-950/40 border-b border-slate-900 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                <th class="px-5 py-4">Symbol / Name</th>
+                <th class="px-5 py-4 text-right">Price</th>
+                <th class="px-5 py-4 text-center">Score</th>
+                <th class="px-5 py-4 text-center">Strategy</th>
+                <th class="px-5 py-4 text-right">JNSAR Dist</th>
+                <th class="px-5 py-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-900/60">
+              <tr *ngFor="let result of filteredResults" 
+                  (click)="selectStock(result)"
+                  class="hover:bg-slate-900/30 cursor-pointer transition relative group"
+                  [ngClass]="selectedStock?.ticker === result.ticker ? 'bg-blue-950/15 border-l-2 border-l-blue-500' : ''">
+                
+                <!-- Stock Ticker & Description -->
+                <td class="px-5 py-3.5">
+                  <div class="flex flex-col">
+                    <span class="font-bold text-sm tracking-wide text-white group-hover:text-blue-400 transition">{{ result.ticker }}</span>
+                    <span class="text-xs text-slate-500 truncate max-w-xs">{{ result.name }}</span>
+                  </div>
+                </td>
+
+                <!-- Price -->
+                <td class="px-5 py-3.5 text-right font-mono font-semibold text-slate-200">
+                  {{ result.price | number:'1.2-2' }}
+                </td>
+
+                <!-- Score indicator bubble -->
+                <td class="px-5 py-3.5 text-center">
+                  <div class="inline-flex items-center justify-center font-bold font-mono h-8 w-8 rounded-lg text-xs border shadow-inner"
+                       [ngClass]="getScoreColorClass(result.score)">
+                    {{ result.score }}
+                  </div>
+                </td>
+
+                <!-- Strategy badge flags -->
+                <td class="px-5 py-3.5 text-center">
+                  <span *ngIf="result.strategy !== 'None'" 
+                        class="text-[10px] font-bold px-2 py-0.5 rounded border"
+                        [ngClass]="result.strategy === 'HCT' ? 'bg-indigo-950/40 text-indigo-400 border-indigo-900/50' : 
+                                   result.strategy === 'LRHR' ? 'bg-teal-950/40 text-teal-400 border-teal-900/50' : 
+                                   'bg-purple-950/40 text-purple-400 border-purple-900/50'">
+                    {{ result.strategy }}
+                  </span>
+                  <span *ngIf="result.strategy === 'None'" class="text-xs text-slate-600">-</span>
+                </td>
+
+                <!-- JNSAR Distance -->
+                <td class="px-5 py-3.5 text-right font-mono text-sm"
+                    [ngClass]="result.distanceToJnsar >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                  <span class="font-medium mr-0.5">{{ result.distanceToJnsar >= 0 ? '+' : '' }}{{ result.distanceToJnsar | number:'1.2-2' }}%</span>
+                  <span class="text-[10px] font-bold">{{ result.distanceToJnsar >= 0 ? '▲' : '▼' }}</span>
+                </td>
+
+                <!-- Watchlist Toggle Action Button -->
+                <td class="px-5 py-3.5 text-center" (click)="$event.stopPropagation()">
+                  <button (click)="toggleWatchlist(result)" 
+                          class="p-1.5 rounded-lg border hover:bg-slate-800 transition"
+                          [ngClass]="isWatchlisted(result.ticker) ? 'bg-amber-950/40 text-amber-400 border-amber-900/50 hover:bg-amber-900/20' : 'bg-slate-950 text-slate-500 border-slate-800/80 hover:text-slate-300'">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" [attr.fill]="isWatchlisted(result.ticker) ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.24.588 1.81l-3.97 2.89a1 1 0 00-.364 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.971-2.89a1 1 0 00-1.175 0l-3.97 2.89c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.364-1.118l-3.97-2.89c-.77-.57-.372-1.81.588-1.81h4.908a1 1 0 00.95-.69l1.519-4.674z" />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+
+              <!-- Empty State if no records matched filters -->
+              <tr *ngIf="filteredResults.length === 0">
+                <td colspan="6" class="px-5 py-12 text-center text-slate-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-3 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p class="font-semibold text-slate-400">No matching stock setups found</p>
+                  <p class="text-xs text-slate-600 mt-1">Try adjusting your search criteria or wait for a market regime shift</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer table details count -->
+        <div class="bg-slate-950/60 border-t border-slate-900 px-5 py-3 flex items-center justify-between text-xs text-slate-500">
+          <span>Displaying {{ filteredResults.length }} matching securities</span>
+          <span>Last Scanned: {{ isScanning ? 'Running...' : 'Database cached' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Workspace Column: TradingView Chart drawer & Scorecard Factor breakdown (Col span 5) -->
+    <div class="xl:col-span-5 flex flex-col gap-6 h-full">
+      
+      <!-- Selected Ticker details panel header -->
+      <div *ngIf="selectedStock" class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-5 shadow-xl flex flex-col gap-5">
+        <div class="flex items-start justify-between">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-xl font-bold text-white tracking-wide">{{ selectedStock.ticker }}</h2>
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-slate-950 border border-slate-800 rounded-md text-slate-400 uppercase tracking-wider">
+                {{ selectedStock.sector }}
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1 font-medium">{{ selectedStock.name }}</p>
+          </div>
+
+          <!-- Watchlist toggle in drawer header -->
+          <button (click)="toggleWatchlist(selectedStock)" 
+                  class="text-xs font-semibold px-4 py-1.5 rounded-xl border transition flex items-center gap-1.5"
+                  [ngClass]="isWatchlisted(selectedStock.ticker) ? 'bg-amber-950/40 text-amber-400 border-amber-900/50 hover:bg-amber-900/20' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" [attr.fill]="isWatchlisted(selectedStock.ticker) ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.24.588 1.81l-3.97 2.89a1 1 0 00-.364 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.971-2.89a1 1 0 00-1.175 0l-3.97 2.89c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.364-1.118l-3.97-2.89c-.77-.57-.372-1.81.588-1.81h4.908a1 1 0 00.95-.69l1.519-4.674z" />
+            </svg>
+            <span>{{ isWatchlisted(selectedStock.ticker) ? 'Watchlisted' : 'Add Watchlist' }}</span>
+          </button>
+        </div>
+
+        <!-- Embedded Canvas Chart Component -->
+        <app-tradingview-chart [data]="chartData" [ticker]="selectedStock.ticker"></app-tradingview-chart>
+
+        <!-- Volatility Fibonacci Target Levels & Position Sizing Card -->
+        <div class="grid grid-cols-3 gap-3 bg-slate-950/80 border border-slate-900 rounded-xl p-4 font-mono text-center">
+          <div class="flex flex-col border-r border-slate-900">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">STOP LOSS</span>
+            <span class="text-sm font-bold text-rose-500">{{ selectedStock.stopLoss | number:'1.2-2' }}</span>
+            <span class="text-[9px] text-slate-600 mt-0.5">Trailing JNSAR</span>
+          </div>
+          <div class="flex flex-col border-r border-slate-900">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">TARGET 1</span>
+            <span class="text-sm font-bold text-sky-400">{{ selectedStock.target1 | number:'1.2-2' }}</span>
+            <span class="text-[9px] text-slate-600 mt-0.5">0.382 Vol Fib</span>
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">TARGET 2</span>
+            <span class="text-sm font-bold text-emerald-400">{{ selectedStock.target2 | number:'1.2-2' }}</span>
+            <span class="text-[9px] text-slate-600 mt-0.5">0.618 Vol Fib</span>
+          </div>
+        </div>
+
+        <!-- Smart Sizing Notice -->
+        <div class="bg-blue-950/10 border border-blue-950/30 rounded-xl p-4 text-xs text-blue-300">
+          <p class="font-bold flex items-center gap-1.5 mb-1 text-blue-400 uppercase tracking-wider">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            Position Sizer Rule
+          </p>
+          <p class="leading-relaxed">
+            Position Size = (Account Capital &times; 1%) &div; ({{ selectedStock.price }} - {{ selectedStock.stopLoss }}).
+            If index regime turns bearish, cut this calculated size in half.
+          </p>
+        </div>
+
+        <!-- Watchlist Open P&L Calculator badge (if selected stock is in watchlist) -->
+        <div *ngIf="isWatchlisted(selectedStock.ticker) && getWatchlistPL(selectedStock)" 
+             class="border border-slate-900 bg-slate-950 p-4 rounded-xl flex items-center justify-between text-sm">
+          <div>
+            <span class="text-xs text-slate-500 font-bold tracking-wider">WATCHLIST ENTRY</span>
+            <p class="font-mono font-bold text-white mt-0.5">{{ getWatchlistEntry(selectedStock.ticker) | number:'1.2-2' }}</p>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-slate-500 font-bold tracking-wider">OPEN P&L</span>
+            <p class="font-mono font-bold mt-0.5" 
+               [ngClass]="getWatchlistPL(selectedStock)!.value >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ getWatchlistPL(selectedStock)!.value >= 0 ? '+' : '' }}{{ getWatchlistPL(selectedStock)!.value | number:'1.2-2' }} 
+              ({{ getWatchlistPL(selectedStock)!.percent >= 0 ? '+' : '' }}{{ getWatchlistPL(selectedStock)!.percent | number:'1.2-2' }}%)
+            </p>
+          </div>
+        </div>
+
+        <!-- 7-Factor Scorecard breakdown inspector -->
+        <div class="border-t border-slate-900/60 pt-4">
+          <h3 class="text-xs font-bold text-slate-400 tracking-wider uppercase mb-3">Scorecard Factor Breakdown (Total: {{ selectedStock.score }}/100)</h3>
+          
+          <div class="flex flex-col gap-3">
+            <!-- 1. Trend -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1">
+                <span class="text-slate-400">1. Trend (EMA 50 & 200 Setup)</span>
+                <span class="font-bold text-white font-mono">{{ selectedStock.trendScore }} / 20</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 border border-slate-900">
+                <div class="bg-blue-500 h-1.5 rounded-full transition-all" [style.width.%]="(selectedStock.trendScore / 20) * 100"></div>
+              </div>
+            </div>
+
+            <!-- 2. Relative Strength -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1">
+                <span class="text-slate-400">2. Relative Strength (vs Nifty 50)</span>
+                <span class="font-bold text-white font-mono">{{ selectedStock.relativeStrengthScore }} / 20</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 border border-slate-900">
+                <div class="bg-violet-500 h-1.5 rounded-full transition-all" [style.width.%]="(selectedStock.relativeStrengthScore / 20) * 100"></div>
+              </div>
+            </div>
+
+            <!-- 3. Proximity to 52W High -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1">
+                <span class="text-slate-400">3. 52W High Proximity (Breakout Setup)</span>
+                <span class="font-bold text-white font-mono">{{ selectedStock.proximityScore }} / 15</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 border border-slate-900">
+                <div class="bg-teal-500 h-1.5 rounded-full transition-all" [style.width.%]="(selectedStock.proximityScore / 15) * 100"></div>
+              </div>
+            </div>
+
+            <!-- 4. Volume Profile -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1">
+                <span class="text-slate-400">4. Volume Analysis (Green vs Red Accumulation)</span>
+                <span class="font-bold text-white font-mono">{{ selectedStock.volumeAccumulationScore }} / 10</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 border border-slate-900">
+                <div class="bg-amber-500 h-1.5 rounded-full transition-all" [style.width.%]="(selectedStock.volumeAccumulationScore / 10) * 100"></div>
+              </div>
+            </div>
+
+            <!-- 5. Volatility Setup -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1">
+                <span class="text-slate-400">5. Volatility Setup (Coiled Spring / ATR)</span>
+                <span class="font-bold text-white font-mono">{{ selectedStock.volatilitySetupScore }} / 10</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 border border-slate-900">
+                <div class="bg-indigo-500 h-1.5 rounded-full transition-all" [style.width.%]="(selectedStock.volatilitySetupScore / 10) * 100"></div>
+              </div>
+            </div>
+
+            <!-- 6. Fundamentals -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1">
+                <span class="text-slate-400">6. Fundamentals (EPS growth & Low Debt)</span>
+                <span class="font-bold text-white font-mono">{{ selectedStock.fundamentalsScore }} / 15</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 border border-slate-900">
+                <div class="bg-emerald-500 h-1.5 rounded-full transition-all" [style.width.%]="(selectedStock.fundamentalsScore / 15) * 100"></div>
+              </div>
+            </div>
+
+            <!-- 7. Institutional Footprint -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1">
+                <span class="text-slate-400">7. Institutional Accumulation Proxy</span>
+                <span class="font-bold text-white font-mono">{{ selectedStock.institutionalFootprintScore }} / 10</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 border border-slate-900">
+                <div class="bg-fuchsia-500 h-1.5 rounded-full transition-all" [style.width.%]="(selectedStock.institutionalFootprintScore / 10) * 100"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- No Stock Selected State -->
+      <div *ngIf="!selectedStock" class="flex-1 border border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center p-8 text-slate-500 min-h-[400px]">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-700 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+        <p class="font-semibold text-slate-400">No stock selected for analysis</p>
+        <p class="text-xs text-slate-600 mt-1">Select a row from the scans list to inspect its chart, target levels, and factor scoring</p>
+      </div>
+    </div>
+  </main>
+</div>

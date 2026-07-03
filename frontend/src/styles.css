@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #080c14;
+  color: #f3f4f6;
+  font-family: 'Outfit', sans-serif;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* Custom Financial Dashboard Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1321;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f293d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}

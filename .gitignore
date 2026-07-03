@@ -1,0 +1,32 @@
+# Database files
+backend/*.db
+backend/*.db-journal
+backend/*.db-wal
+backend/*.db-shm
+
+# C# / .NET
+[Bb]in/
+[Ob]j/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Angular / Node
+node_modules/
+.angular/
+dist/
+tmp/
+.sass-cache/
+connect.lock
+input.data
+out-of-memory.log
+
+# IDEs & Text Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
