@@ -15,6 +15,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Register Services
 builder.Services.AddHttpClient<YahooFinanceService>();
 builder.Services.AddScoped<IndicatorService>();
+builder.Services.AddSingleton<FyersMcpService>();
 builder.Services.AddScoped<ScannerService>();
 
 // Enable CORS for Angular frontend

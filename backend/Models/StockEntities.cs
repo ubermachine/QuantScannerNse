@@ -91,7 +91,20 @@ namespace backend.Models
         public int VolatilitySetupScore { get; set; } // Max 10
         public int FundamentalsScore { get; set; } // Max 15
         public int InstitutionalFootprintScore { get; set; } // Max 10
+
+        // FYERS Options Flow Enrichment
+        public FyersOptionsFlowData? FyersOptionsFlow { get; set; }
     }
+
+    public class FyersOptionsFlowData
+    {
+        public double Pcr { get; set; }
+        public double Skew { get; set; }
+        public string SqueezeStatus { get; set; } = "Neutral";
+        public bool NeedsLogin { get; set; }
+        public string? LoginUrl { get; set; }
+    }
+
 
     public class HistoricalChartResponse
     {

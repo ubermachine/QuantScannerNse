@@ -36,6 +36,17 @@ export interface StockScanResult {
   volatilitySetupScore: number;
   fundamentalsScore: number;
   institutionalFootprintScore: number;
+
+  // FYERS Options Flow
+  fyersOptionsFlow?: FyersOptionsFlowData;
+}
+
+export interface FyersOptionsFlowData {
+  pcr: number;
+  skew: number;
+  squeezeStatus: string;
+  needsLogin: boolean;
+  loginUrl?: string;
 }
 
 export interface ScanResponse {

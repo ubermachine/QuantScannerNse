@@ -218,4 +218,46 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (score >= 40) return 'text-amber-400 bg-amber-950/40 border-amber-900/60 shadow-amber-500/5';
     return 'text-rose-400 bg-rose-950/40 border-rose-900/60 shadow-rose-500/5';
   }
+
+  get fyersNeedsLogin(): boolean {
+    if (!this.scanResponse) return false;
+    return this.scanResponse.results.some(r => (r.isHctMatch || r.isLrhrMatch) && r.fyersOptionsFlow?.needsLogin === true);
+  }
+
+  triggerFyersLogin() {
+    const matchedStock = this.scanResponse?.results.find(r => r.fyersOptionsFlow?.needsLogin);
+    const loginUrl = matchedStock?.fyersOptionsFlow?.loginUrl || this.selectedStock?.fyersOptionsFlow?.loginUrl;
+
+    if (loginUrl) {
+      window.open(loginUrl, '_blank');
+      this.pollForFyersAuthentication();
+    } else {
+      this.scannerService.getFyersLoginUrl().subscribe({
+        next: (res) => {
+          window.open(res.loginUrl, '_blank');
+          this.pollForFyersAuthentication();
+        },
+        error: (err) => console.error('Failed to get login URL', err)
+      });
+    }
+  }
+
+  private pollForFyersAuthentication() {
+    const interval = setInterval(() => {
+      this.scannerService.scan().subscribe((res) => {
+        const matches = res.results.filter(r => r.isHctMatch || r.isLrhrMatch);
+        const stillNeedsLogin = matches.some(r => r.fyersOptionsFlow?.needsLogin);
+
+        if (!stillNeedsLogin || matches.length === 0) {
+          clearInterval(interval);
+          this.scanResponse = res;
+          this.applyFilter();
+          if (this.selectedStock) {
+            const updated = res.results.find(r => r.ticker === this.selectedStock!.ticker);
+            if (updated) this.selectedStock = updated;
+          }
+        }
+      });
+    }, 3000);
+  }
 }

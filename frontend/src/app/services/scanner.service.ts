@@ -38,4 +38,8 @@ export class ScannerService {
   removeFromWatchlist(ticker: string): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/watchlist/${ticker}`);
   }
+
+  getFyersLoginUrl(): Observable<{ loginUrl: string }> {
+    return this.http.get<{ loginUrl: string }>(`${this.apiUrl}/fyers/login`);
+  }
 }

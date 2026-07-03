@@ -25,15 +25,18 @@ namespace backend.Controllers
         private readonly ScannerService _scannerService;
         private readonly AppDbContext _context;
         private readonly IndicatorService _indicatorService;
+        private readonly FyersMcpService _fyersMcpService;
 
         public ScanController(
             ScannerService scannerService,
             AppDbContext context,
-            IndicatorService indicatorService)
+            IndicatorService indicatorService,
+            FyersMcpService fyersMcpService)
         {
             _scannerService = scannerService;
             _context = context;
             _indicatorService = indicatorService;
+            _fyersMcpService = fyersMcpService;
         }
 
         [HttpGet("scan")]
@@ -43,6 +46,20 @@ namespace backend.Controllers
             {
                 var scanResult = await _scannerService.ExecuteScanAsync();
                 return Ok(scanResult);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("fyers/login")]
+        public async Task<IActionResult> GetFyersLoginUrl()
+        {
+            try
+            {
+                var loginUrl = await _fyersMcpService.TriggerLoginFlowAsync();
+                return Ok(new { loginUrl });
             }
             catch (Exception ex)
             {

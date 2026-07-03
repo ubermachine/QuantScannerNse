@@ -18,6 +18,7 @@ namespace backend.Services
         private readonly YahooFinanceService _yahooFinanceService;
         private readonly IndicatorService _indicatorService;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly FyersMcpService _fyersMcpService;
 
         private static Dictionary<string, StockSeriesData>? _cachedDailyGroups;
         private static Dictionary<string, WeeklySeriesData>? _cachedWeeklyGroups;
@@ -28,12 +29,14 @@ namespace backend.Services
             AppDbContext context,
             YahooFinanceService yahooFinanceService,
             IndicatorService indicatorService,
-            IServiceScopeFactory scopeFactory)
+            IServiceScopeFactory scopeFactory,
+            FyersMcpService fyersMcpService)
         {
             _context = context;
             _yahooFinanceService = yahooFinanceService;
             _indicatorService = indicatorService;
             _scopeFactory = scopeFactory;
+            _fyersMcpService = fyersMcpService;
         }
 
         public async Task<ScanResponse> ExecuteScanAsync()
@@ -358,6 +361,16 @@ namespace backend.Services
             });
 
             var results = resultsBag.OrderByDescending(r => r.Score).ToList();
+
+            // Enrich matched HCT or LRHR stocks with Options Flow metrics from FYERS MCP
+            foreach (var result in results)
+            {
+                if (result.IsHctMatch || result.IsLrhrMatch)
+                {
+                    result.FyersOptionsFlow = await _fyersMcpService.QueryOptionsFlowAsync(result.Ticker);
+                }
+            }
+
             response.Results = results;
             return response;
         }
