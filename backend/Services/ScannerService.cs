@@ -1,20 +1,21 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using backend.Data;
+using Microsoft.Extensions.Logging;
+using DuckDB.NET.Data;
+using Dapper;
 using backend.Models;
+using Microsoft.AspNetCore.SignalR;
 
 namespace backend.Services
 {
     public class ScannerService
     {
-        private readonly AppDbContext _context;
+        private readonly string _connectionString = "Data Source=quantscanner.duckdb";
         private readonly YahooFinanceService _yahooFinanceService;
         private readonly IndicatorService _indicatorService;
         private readonly IServiceScopeFactory _scopeFactory;
@@ -26,13 +27,11 @@ namespace backend.Services
         private static readonly object _cacheLock = new object();
 
         public ScannerService(
-            AppDbContext context,
             YahooFinanceService yahooFinanceService,
             IndicatorService indicatorService,
             IServiceScopeFactory scopeFactory,
             FyersMcpService fyersMcpService)
         {
-            _context = context;
             _yahooFinanceService = yahooFinanceService;
             _indicatorService = indicatorService;
             _scopeFactory = scopeFactory;
@@ -52,10 +51,9 @@ namespace backend.Services
             // Get Nifty 50 returns for relative strength calculations
             double indexReturn3M = 0;
             double indexReturn6M = 0;
-            var indexBars = await _context.DailyBars
-                .Where(b => b.Ticker == "^NSEI")
-                .OrderBy(b => b.Date)
-                .ToListAsync();
+            using var earlyConn = new DuckDBConnection(_connectionString);
+            earlyConn.Open();
+            var indexBars = earlyConn.Query<DailyBar>("SELECT * FROM DailyBars WHERE Ticker = '^NSEI' ORDER BY Date").ToList();
 
             if (indexBars.Count > 120)
             {
@@ -71,7 +69,7 @@ namespace backend.Services
             }
 
             // 2. Fetch all tickers in our database
-            var stocks = await _context.StockMetadatas.ToListAsync();
+            var stocks = earlyConn.Query<StockMetadata>("SELECT * FROM StockMetadatas").ToList();
 
             Dictionary<string, StockSeriesData> dailyGroups;
             Dictionary<string, WeeklySeriesData> weeklyGroups;
@@ -87,36 +85,23 @@ namespace backend.Services
                 var newDailyGroups = new Dictionary<string, StockSeriesData>();
                 var newWeeklyGroups = new Dictionary<string, WeeklySeriesData>();
 
-                var connection = _context.Database.GetDbConnection();
-                bool wasOpen = connection.State == ConnectionState.Open;
-                if (!wasOpen) await connection.OpenAsync();
+                var connection = new DuckDBConnection(_connectionString);
+                connection.Open();
 
                 try
                 {
-                    // Fetch Daily Bars raw without ORDER BY for sequential table scan speed!
-                    var rawDaily = new Dictionary<string, List<RawCandle>>();
-                    using (var command = connection.CreateCommand())
+                    // Fetch Daily Bars raw
+                    var rawDailyData = connection.Query<DailyBar>("SELECT Ticker, High, Low, Close, Volume, Date FROM DailyBars");
+                    var rawDaily = new Dictionary<string, List<DailyBar>>();
+                    foreach (var row in rawDailyData)
                     {
-                        command.CommandText = "SELECT Ticker, High, Low, Close, Volume, Date FROM DailyBars";
-                        using (var reader = await command.ExecuteReaderAsync())
+                        if (string.IsNullOrEmpty(row.Ticker)) continue;
+                        if (!rawDaily.TryGetValue(row.Ticker, out var list))
                         {
-                            while (await reader.ReadAsync())
-                            {
-                                string ticker = reader.GetString(0);
-                                double high = reader.GetDouble(1);
-                                double low = reader.GetDouble(2);
-                                double close = reader.GetDouble(3);
-                                double volume = (double)reader.GetInt64(4);
-                                DateTime date = reader.GetDateTime(5);
-
-                                if (!rawDaily.TryGetValue(ticker, out var list))
-                                {
-                                    list = new List<RawCandle>();
-                                    rawDaily[ticker] = list;
-                                }
-                                list.Add(new RawCandle { Date = date, High = high, Low = low, Close = close, Volume = volume });
-                            }
+                            list = new List<DailyBar>();
+                            rawDaily[row.Ticker] = list;
                         }
+                        list.Add(row);
                     }
 
                     // Sort in memory (takes < 1ms in CPU)
@@ -130,31 +115,24 @@ namespace backend.Services
                             data.Lows.Add(c.Low);
                             data.Closes.Add(c.Close);
                             data.Volumes.Add(c.Volume);
+                            data.Dates.Add(c.Date);
                         }
                         newDailyGroups[kvp.Key] = data;
                     }
 
-                    // Fetch Weekly Bars raw without ORDER BY
-                    var rawWeekly = new Dictionary<string, List<RawWeeklyCandle>>();
-                    using (var command = connection.CreateCommand())
+                    // Fetch Weekly Bars raw
+                    var rawWeeklyData = connection.Query<WeeklyBar>("SELECT Ticker, Close, Date FROM WeeklyBars");
+                    var rawWeekly = new Dictionary<string, List<WeeklyBar>>();
+                    
+                    foreach (var row in rawWeeklyData)
                     {
-                        command.CommandText = "SELECT Ticker, Close, Date FROM WeeklyBars";
-                        using (var reader = await command.ExecuteReaderAsync())
+                        if (string.IsNullOrEmpty(row.Ticker)) continue;
+                        if (!rawWeekly.TryGetValue(row.Ticker, out var list))
                         {
-                            while (await reader.ReadAsync())
-                            {
-                                string ticker = reader.GetString(0);
-                                double close = reader.GetDouble(1);
-                                DateTime date = reader.GetDateTime(2);
-
-                                if (!rawWeekly.TryGetValue(ticker, out var list))
-                                {
-                                    list = new List<RawWeeklyCandle>();
-                                    rawWeekly[ticker] = list;
-                                }
-                                list.Add(new RawWeeklyCandle { Date = date, Close = close });
-                            }
+                            list = new List<WeeklyBar>();
+                            rawWeekly[row.Ticker] = list;
                         }
+                        list.Add(row);
                     }
 
                     foreach (var kvp in rawWeekly)
@@ -170,7 +148,7 @@ namespace backend.Services
                 }
                 finally
                 {
-                    if (!wasOpen) await connection.CloseAsync();
+                    connection.Dispose();
                 }
 
                 lock (_cacheLock)
@@ -203,6 +181,7 @@ namespace backend.Services
                     var dailyHighs = dailyData.Highs.ToArray();
                     var dailyLows = dailyData.Lows.ToArray();
                     var dailyVolumes = dailyData.Volumes.ToArray();
+                    var dailyDates = dailyData.Dates.ToArray();
                     
                     var weeklyCloses = weeklyData.Closes.ToArray();
 
@@ -219,12 +198,26 @@ namespace backend.Services
                     // Weekly EMAs for LRHR
                     var ema144w = _indicatorService.CalculateEma(weeklyCloses, 144);
                     var ema233w = _indicatorService.CalculateEma(weeklyCloses, 233);
-                    var (wMacdLine, wMacdSignal) = _indicatorService.CalculateWeeklyMacd(weeklyCloses);
+                    var (wMacdLine, wMacdSignal) = _indicatorService.CalculateMacd(weeklyCloses);
 
                     // ATR Volatility Contraction
                     var atr14 = _indicatorService.CalculateAtr(dailyHighs, dailyLows, dailyCloses, 14);
                     var atr14Avg60 = atr14.Length > 60 ? atr14.TakeLast(60).Average() : atr14[^1];
                     bool isAtrCoiled = atr14[^1] < atr14Avg60;
+
+                    // Quant-Grade Indicators
+                    var rsi = _indicatorService.CalculateRsi(dailyCloses);
+                    var adx = _indicatorService.CalculateAdx(dailyHighs, dailyLows, dailyCloses);
+                    var (upperB, middleB, lowerB) = _indicatorService.CalculateBollingerBands(dailyCloses);
+                    var (upperK, middleK, lowerK) = _indicatorService.CalculateKeltnerChannels(dailyHighs, dailyLows, dailyCloses);
+                    double zScore = _indicatorService.CalculateZScoreLast(dailyCloses);
+                    
+                    bool isSqueezeFiring = upperB[^1] < upperK[^1] && lowerB[^1] > lowerK[^1];
+
+                    // Prop Desk / Institutional Indicators
+                    double poc = _indicatorService.CalculatePointOfControl(dailyCloses, dailyVolumes);
+                    double ytdVwap = _indicatorService.CalculateYtdVwap(dailyCloses, dailyHighs, dailyLows, dailyVolumes, dailyDates);
+                    double chandelierExit = _indicatorService.CalculateChandelierExit(dailyHighs, dailyLows, dailyCloses);
 
                     // 52-Week High Proximity
                     double max52WHigh = dailyHighs.TakeLast(250).Max();
@@ -241,12 +234,20 @@ namespace backend.Services
                     {
                         stopLoss = jnsar[^1]; // Trail close to JNSAR
                     }
+                    
+                    // The Chandelier Exit is now our primary trailing stop for prop desk logic.
+                    // If it's tighter than the default stop loss, we use it to limit risk.
+                    if (currentPrice > chandelierExit && chandelierExit > stopLoss)
+                    {
+                        stopLoss = chandelierExit;
+                    }
 
                     // --- SCORECARD SCORING ENGINE ---
                     int trendScore = 0;
-                    if (currentPrice > ema50[^1]) trendScore += 10;
+                    if (currentPrice > ema50[^1]) trendScore += 5;
                     if (ema50[^1] > ema200[^1]) trendScore += 5;
                     if (ema50[^1] > ema50[ema50.Length - 5]) trendScore += 5; // rising
+                    if (adx[^1] > 25) trendScore += 5; // ADX confirms strong trend
 
                     int rsScore = 0;
                     double stockReturn3M = _indicatorService.CalculateReturn(dailyCloses, 60);
@@ -261,7 +262,8 @@ namespace backend.Services
                     int volScore = _indicatorService.CalculateVolumeScore(dailyCloses, dailyVolumes, 15);
                     int volumeAccumulationScore = volScore;
 
-                    int volatilitySetupScore = isAtrCoiled ? 10 : 0;
+                    int volatilitySetupScore = isAtrCoiled ? 5 : 0;
+                    if (isSqueezeFiring) volatilitySetupScore += 5; // Squeeze adds conviction
 
                     // Standard rules: Positive EPS growth YoY, low D/E
                     double epsGrowth = 15.0; // mock default
@@ -319,30 +321,63 @@ namespace backend.Services
                     else if (isHct) strategyName = "HCT";
                     else if (isLrhr) strategyName = "LRHR";
 
+                    string conviction = totalScore >= 75 ? "High" : (totalScore >= 50 ? "Medium" : "Low");
+                    
+                    // Modify Conviction based on Quant Filters
+                    if (rsi[^1] > 75) conviction = "Low"; // Overbought exhaustion risk
+                    else if (isSqueezeFiring && totalScore >= 60) conviction = "High"; // Coiled for breakout
+                    else if (currentPrice > poc && currentPrice > ytdVwap && totalScore >= 60) conviction = "High"; // Institutional trend confirmation
+
+                    string logic = "";
+                    if (isHct) logic += "Price tracking near JNSAR and 200 EMA with strong upside momentum. ";
+                    if (isLrhr) logic += "Significant discount with a bounce off 144w/233w weekly averages. ";
+                    if (isSqueezeFiring) logic += "Bollinger bands contracted inside Keltner Channels (Squeeze Firing). ";
+                    if (adx[^1] > 25) logic += $"Strong directional trend confirmed by ADX ({Math.Round(adx[^1], 1)}). ";
+                    if (currentPrice > poc) logic += "Trading above the 150-day Volume Point of Control (HVN support). ";
+                    if (currentPrice > ytdVwap) logic += "Trending above Institutional YTD VWAP. ";
+                    if (zScore > 2.5) logic += "WARNING: Statistically overextended (Z-Score > 2.5). ";
+                    
+                    if (string.IsNullOrEmpty(logic)) logic = "No distinct structural edge.";
+
+                    double SafeRound(double value, int decimals)
+                    {
+                        if (double.IsNaN(value) || double.IsInfinity(value)) return 0;
+                        return Math.Round(value, decimals);
+                    }
+
                     resultsBag.Add(new StockScanResult
                     {
                         Ticker = stock.Ticker,
                         Name = stock.Name,
                         Sector = stock.Sector,
-                        Price = Math.Round(currentPrice, 2),
+                        Price = SafeRound(currentPrice, 2),
                         Score = totalScore,
                         IsHctMatch = isHct,
                         IsLrhrMatch = isLrhr,
                         Strategy = strategyName,
-                        Jnsar = Math.Round(jnsar[^1], 2),
-                        DistanceToJnsar = Math.Round(((currentPrice - jnsar[^1]) / jnsar[^1]) * 100.0, 2),
-                        Ema200 = Math.Round(ema200[^1], 2),
-                        Ema50 = Math.Round(ema50[^1], 2),
-                        Fib618 = Math.Round(fib618, 2),
-                        Atr14 = Math.Round(atr14[^1], 2),
+                        Conviction = conviction,
+                        Logic = logic.Trim(),
+                        Jnsar = SafeRound(jnsar[^1], 2),
+                        DistanceToJnsar = SafeRound(((currentPrice - jnsar[^1]) / (jnsar[^1] == 0 ? 1 : jnsar[^1])) * 100.0, 2),
+                        Ema200 = SafeRound(ema200[^1], 2),
+                        Ema50 = SafeRound(ema50[^1], 2),
+                        Fib618 = SafeRound(fib618, 2),
+                        Atr14 = SafeRound(atr14[^1], 2),
                         IsVolatilityCoiled = isAtrCoiled,
-                        ProximityTo52WHigh = Math.Round(discount52W * 100.0, 2),
+                        IsSqueezeFiring = isSqueezeFiring,
+                        Rsi14 = SafeRound(rsi[^1], 2),
+                        Adx14 = SafeRound(adx[^1], 2),
+                        ZScore = SafeRound(zScore, 2),
+                        ProximityTo52WHigh = SafeRound(discount52W * 100.0, 2),
                         VolumeScore = volumeAccumulationScore,
+                        PointOfControl = SafeRound(poc, 2),
+                        YtdVwap = SafeRound(ytdVwap, 2),
+                        ChandelierExit = SafeRound(chandelierExit, 2),
                         EpsGrowthYoY = epsGrowth,
                         DebtToEquity = debtToEquity,
-                        StopLoss = Math.Round(stopLoss, 2),
-                        Target1 = Math.Round(target1, 2),
-                        Target2 = Math.Round(target2, 2),
+                        StopLoss = SafeRound(stopLoss, 2),
+                        Target1 = SafeRound(target1, 2),
+                        Target2 = SafeRound(target2, 2),
                         
                         // Score breakdown
                         TrendScore = trendScore,
@@ -385,12 +420,18 @@ namespace backend.Services
                 await SaveDailyBarsAsync("^NSEI", indexBars);
             }
 
-            var stocks = await _context.StockMetadatas.ToListAsync();
+            using var syncConn = new DuckDBConnection(_connectionString);
+            syncConn.Open();
+            var stocks = syncConn.Query<StockMetadata>("SELECT * FROM StockMetadatas").ToList();
             int total = stocks.Count;
             int counter = 0;
 
-            // Use SemaphoreSlim to run up to 10 concurrent download tasks from Yahoo Finance
-            var semaphore = new SemaphoreSlim(10);
+            using var sharedContext = new DuckDBConnection(_connectionString);
+            sharedContext.Open();
+
+            // Use SemaphoreSlim to run up to 50 concurrent download tasks from Yahoo Finance
+            var semaphore = new SemaphoreSlim(50);
+            var dbSemaphore = new SemaphoreSlim(1);
             var tasks = stocks.Select(async stock =>
             {
                 await semaphore.WaitAsync();
@@ -399,19 +440,22 @@ namespace backend.Services
                     // 1. Download Price Bars (daily and weekly)
                     var (daily, weekly) = await _yahooFinanceService.FetchHistoricalDataAsync(stock.Ticker);
 
-                    // 2. Commit to database within a thread-safe scoped DbContext
-                    using (var scope = _scopeFactory.CreateScope())
+                    // 2. Commit to database sequentially using the shared connection to prevent locking overhead
+                    await dbSemaphore.WaitAsync();
+                    try
                     {
-                        var localContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
                         if (daily.Count > 0)
                         {
-                            await SaveDailyBarsInternalAsync(localContext, stock.Ticker, daily);
+                            await SaveDailyBarsInternalAsync(sharedContext, stock.Ticker, daily);
                         }
                         if (weekly.Count > 0)
                         {
-                            await SaveWeeklyBarsInternalAsync(localContext, stock.Ticker, weekly);
+                            await SaveWeeklyBarsInternalAsync(sharedContext, stock.Ticker, weekly);
                         }
+                    }
+                    finally
+                    {
+                        dbSemaphore.Release();
                     }
 
                     int currentCount = Interlocked.Increment(ref counter);
@@ -444,44 +488,64 @@ namespace backend.Services
             }
         }
 
-        private async Task SaveDailyBarsInternalAsync(AppDbContext context, string ticker, List<DailyBar> freshBars)
+        private async Task SaveDailyBarsInternalAsync(DuckDBConnection context, string ticker, List<DailyBar> freshBars)
         {
-            var existingDates = await context.DailyBars
-                .Where(b => b.Ticker == ticker)
-                .Select(b => b.Date)
-                .ToHashSetAsync();
+            var existingDates = context.Query<DateTime>("SELECT Date FROM DailyBars WHERE Ticker = $Ticker", new { Ticker = ticker }).ToHashSet();
 
             var newBars = freshBars.Where(b => !existingDates.Contains(b.Date)).ToList();
             if (newBars.Count > 0)
             {
-                context.DailyBars.AddRange(newBars);
-                await context.SaveChangesAsync();
+                using var appender = context.CreateAppender("DailyBars");
+                foreach (var b in newBars)
+                {
+                    var row = appender.CreateRow();
+                    row.AppendValue(b.Ticker);
+                    row.AppendValue(b.Date);
+                    row.AppendValue(b.Open);
+                    row.AppendValue(b.High);
+                    row.AppendValue(b.Low);
+                    row.AppendValue(b.Close);
+                    row.AppendValue(b.Volume);
+                    row.EndRow();
+                }
+                appender.Close();
             }
         }
 
-        private async Task SaveWeeklyBarsInternalAsync(AppDbContext context, string ticker, List<WeeklyBar> freshBars)
+        private async Task SaveWeeklyBarsInternalAsync(DuckDBConnection context, string ticker, List<WeeklyBar> freshBars)
         {
-            var existingDates = await context.WeeklyBars
-                .Where(b => b.Ticker == ticker)
-                .Select(b => b.Date)
-                .ToHashSetAsync();
+            var existingDates = context.Query<DateTime>("SELECT Date FROM WeeklyBars WHERE Ticker = $Ticker", new { Ticker = ticker }).ToHashSet();
 
             var newBars = freshBars.Where(b => !existingDates.Contains(b.Date)).ToList();
             if (newBars.Count > 0)
             {
-                context.WeeklyBars.AddRange(newBars);
-                await context.SaveChangesAsync();
+                using var appender = context.CreateAppender("WeeklyBars");
+                foreach (var b in newBars)
+                {
+                    var row = appender.CreateRow();
+                    row.AppendValue(b.Ticker);
+                    row.AppendValue(b.Date);
+                    row.AppendValue(b.Open);
+                    row.AppendValue(b.High);
+                    row.AppendValue(b.Low);
+                    row.AppendValue(b.Close);
+                    row.AppendValue(b.Volume);
+                    row.EndRow();
+                }
+                appender.Close();
             }
         }
 
         private async Task SaveDailyBarsAsync(string ticker, List<DailyBar> freshBars)
         {
-            await SaveDailyBarsInternalAsync(_context, ticker, freshBars);
+            using var conn = new DuckDBConnection(_connectionString); conn.Open();
+            await SaveDailyBarsInternalAsync(conn, ticker, freshBars);
         }
 
         private async Task SaveWeeklyBarsAsync(string ticker, List<WeeklyBar> freshBars)
         {
-            await SaveWeeklyBarsInternalAsync(_context, ticker, freshBars);
+            using var conn = new DuckDBConnection(_connectionString); conn.Open();
+            await SaveWeeklyBarsInternalAsync(conn, ticker, freshBars);
         }
     }
 
@@ -491,6 +555,7 @@ namespace backend.Services
         public List<double> Highs { get; } = new();
         public List<double> Lows { get; } = new();
         public List<double> Volumes { get; } = new();
+        public List<DateTime> Dates { get; } = new();
     }
 
     public class WeeklySeriesData

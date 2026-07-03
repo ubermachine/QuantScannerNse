@@ -21,6 +21,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isScanning: boolean = false;
   syncStatus: SyncStatus | null = null;
   searchTerm: string = '';
+
   
   // Watchlist addition fields
   showWatchlistAdd: boolean = false;
@@ -130,7 +131,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   applyFilter() {
     if (!this.scanResponse) return;
 
-    let baseList = this.scanResponse.results;
+    // Always show only high conviction stocks (Score >= 85)
+    let baseList = this.scanResponse.results.filter(r => r.score >= 85);
 
     // Filter by Strategy Tab
     if (this.activeTab === 'lrhr') {
@@ -221,43 +223,77 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   get fyersNeedsLogin(): boolean {
     if (!this.scanResponse) return false;
-    return this.scanResponse.results.some(r => (r.isHctMatch || r.isLrhrMatch) && r.fyersOptionsFlow?.needsLogin === true);
+    return this.scanResponse.results.some(r => r.score >= 85 && (
+      r.fyersOptionsFlow?.needsLogin === true ||
+      r.fyersOptionsFlow?.squeezeStatus === 'Fyers Unavailable' ||
+      r.fyersOptionsFlow?.squeezeStatus === 'Fyers Connection Error'
+    ));
   }
 
   triggerFyersLogin() {
-    const matchedStock = this.scanResponse?.results.find(r => r.fyersOptionsFlow?.needsLogin);
-    const loginUrl = matchedStock?.fyersOptionsFlow?.loginUrl || this.selectedStock?.fyersOptionsFlow?.loginUrl;
-
-    if (loginUrl) {
-      window.open(loginUrl, '_blank');
-      this.pollForFyersAuthentication();
-    } else {
-      this.scannerService.getFyersLoginUrl().subscribe({
-        next: (res) => {
+    // Always request a fresh login URL from the backend.
+    // The backend resets its circuit breaker and starts a new MCP connection.
+    this.scannerService.getFyersLoginUrl().subscribe({
+      next: (res) => {
+        if (res.loginUrl) {
           window.open(res.loginUrl, '_blank');
           this.pollForFyersAuthentication();
-        },
-        error: (err) => console.error('Failed to get login URL', err)
-      });
-    }
+        } else {
+          alert('FYERS MCP server could not be reached. Please ensure npx/Node.js is installed and try again.');
+        }
+      },
+      error: (err) => {
+        console.error('Failed to get FYERS login URL', err);
+        alert('Failed to connect to FYERS. Check that the backend is running and npx is available.');
+      }
+    });
   }
 
   private pollForFyersAuthentication() {
     const interval = setInterval(() => {
-      this.scannerService.scan().subscribe((res) => {
-        const matches = res.results.filter(r => r.isHctMatch || r.isLrhrMatch);
-        const stillNeedsLogin = matches.some(r => r.fyersOptionsFlow?.needsLogin);
-
-        if (!stillNeedsLogin || matches.length === 0) {
-          clearInterval(interval);
-          this.scanResponse = res;
-          this.applyFilter();
-          if (this.selectedStock) {
-            const updated = res.results.find(r => r.ticker === this.selectedStock!.ticker);
-            if (updated) this.selectedStock = updated;
+      this.scannerService.getFyersStatus().subscribe({
+        next: (status) => {
+          if (!status.needsLogin) {
+            clearInterval(interval);
+            this.runScan(); // Run a full scan once to populate the page with the newly loaded data
           }
+        },
+        error: (err) => {
+          console.error('Failed to check Fyers status', err);
         }
       });
-    }, 3000);
+    }, 4000);
+  }
+
+  populateOptionsData(ticker: string) {
+    if (!this.selectedStock) return;
+    
+    // Visually flag options loading status
+    this.selectedStock.fyersOptionsFlow = {
+      needsLogin: false,
+      squeezeStatus: 'Loading...',
+      pcr: 0,
+      skew: 0
+    };
+
+    this.scannerService.getFyersOptions(ticker).subscribe({
+      next: (data) => {
+        if (this.selectedStock && this.selectedStock.ticker === ticker) {
+          this.selectedStock.fyersOptionsFlow = data;
+        }
+      },
+      error: (err) => {
+        console.error('Failed to populate options data', err);
+        if (this.selectedStock && this.selectedStock.ticker === ticker) {
+          this.selectedStock.fyersOptionsFlow = {
+            needsLogin: false,
+            squeezeStatus: 'Error Loading',
+            pcr: 0,
+            skew: 0
+          };
+        }
+      }
+    });
   }
 }
+

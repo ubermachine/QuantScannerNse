@@ -1,5 +1,5 @@
 import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, SimpleChanges, ViewChild } from '@angular/core';
-import { createChart, IChartApi, ISeriesApi, LineStyle, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, LineStyle, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts';
 import { ChartCandle } from '../../models/scanner.model';
 
 @Component({
@@ -24,6 +24,9 @@ export class TradingViewChartComponent implements OnInit, OnChanges, OnDestroy {
   private ema21Series: any = null;
   private ema200Series: any = null;
   private jnsarSeries: any = null;
+  private macdLineSeries: any = null;
+  private macdSignalSeries: any = null;
+  private macdHistogramSeries: any = null;
   private resizeObserver: ResizeObserver | null = null;
 
   ngOnInit() {
@@ -119,6 +122,40 @@ export class TradingViewChartComponent implements OnInit, OnChanges, OnDestroy {
       title: 'JNSAR'
     });
 
+    // 3. MACD Series (Pane 2)
+    this.macdHistogramSeries = this.chart.addSeries(HistogramSeries, {
+      priceScaleId: 'macd',
+      title: 'MACD Hist'
+    });
+    this.macdLineSeries = this.chart.addSeries(LineSeries, {
+      color: '#3b82f6', // Blue MACD line
+      lineWidth: 2,
+      priceScaleId: 'macd',
+      title: 'MACD'
+    });
+    this.macdSignalSeries = this.chart.addSeries(LineSeries, {
+      color: '#f97316', // Orange Signal line
+      lineWidth: 1,
+      priceScaleId: 'macd',
+      title: 'Signal'
+    });
+
+    // Configure MACD scale to occupy bottom 25% of chart
+    this.chart.priceScale('macd').applyOptions({
+      scaleMargins: {
+        top: 0.75, // 75% spacing from top
+        bottom: 0,
+      },
+    });
+
+    // Compress main scale slightly so they don't overlap as much
+    this.chart.priceScale('right').applyOptions({
+      scaleMargins: {
+        top: 0.05,
+        bottom: 0.30,
+      }
+    });
+
     this.updateData();
 
     // 3. Make Responsive
@@ -166,6 +203,28 @@ export class TradingViewChartComponent implements OnInit, OnChanges, OnDestroy {
       .filter(c => c.jnsar !== null)
       .map(c => ({ time: c.date, value: c.jnsar! }));
     this.jnsarSeries.setData(jnsarData);
+
+    // Map MACD Line
+    const macdLineData = this.data
+      .filter(c => c.macdLine !== null)
+      .map(c => ({ time: c.date, value: c.macdLine! }));
+    this.macdLineSeries.setData(macdLineData);
+
+    // Map MACD Signal
+    const macdSignalData = this.data
+      .filter(c => c.macdSignal !== null)
+      .map(c => ({ time: c.date, value: c.macdSignal! }));
+    this.macdSignalSeries.setData(macdSignalData);
+
+    // Map MACD Histogram
+    const macdHistData = this.data
+      .filter(c => c.macdHistogram !== null)
+      .map(c => ({ 
+        time: c.date, 
+        value: c.macdHistogram!,
+        color: c.macdHistogram! > 0 ? (this.data.indexOf(c) > 0 && c.macdHistogram! > this.data[this.data.indexOf(c)-1].macdHistogram! ? '#10b981' : '#34d399') : (this.data.indexOf(c) > 0 && c.macdHistogram! < this.data[this.data.indexOf(c)-1].macdHistogram! ? '#ef4444' : '#f87171')
+      }));
+    this.macdHistogramSeries.setData(macdHistData);
 
     // Remove any existing price lines from previous stocks
     this.candlestickSeries.clearPriceLines();

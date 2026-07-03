@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-using backend.Data;
+using DuckDB.NET.Data;
+using Dapper;
 using backend.Models;
 using backend.Services;
 
@@ -8,9 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
-// Register Database Context (SQLite)
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=quantscanner.db"));
+// Database registration removed
 
 // Register Services
 builder.Services.AddHttpClient<YahooFinanceService>();
@@ -39,12 +37,17 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Seeder: Create database and insert default tickers on startup
-using (var scope = app.Services.CreateScope())
+using (var connection = new DuckDBConnection("Data Source=quantscanner.duckdb"))
 {
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    context.Database.EnsureCreated();
-
-    if (!context.StockMetadatas.Any())
+    connection.Open();
+    connection.Execute(@"
+        CREATE TABLE IF NOT EXISTS StockMetadatas (Ticker VARCHAR PRIMARY KEY, Name VARCHAR, Sector VARCHAR);
+        CREATE TABLE IF NOT EXISTS WatchlistItems (Ticker VARCHAR PRIMARY KEY, EntryPrice DOUBLE);
+        CREATE TABLE IF NOT EXISTS DailyBars (Ticker VARCHAR, Date TIMESTAMP, Open DOUBLE, High DOUBLE, Low DOUBLE, Close DOUBLE, Volume BIGINT, PRIMARY KEY (Ticker, Date));
+        CREATE TABLE IF NOT EXISTS WeeklyBars (Ticker VARCHAR, Date TIMESTAMP, Open DOUBLE, High DOUBLE, Low DOUBLE, Close DOUBLE, Volume BIGINT, PRIMARY KEY (Ticker, Date));
+    ");
+    var count = connection.ExecuteScalar<int>("SELECT COUNT(*) FROM StockMetadatas");
+    if (count == 0)
     {
         var defaultTickers = new string[]
         {
@@ -224,15 +227,9 @@ using (var scope = app.Services.CreateScope())
             "ZYDUSLIFE.NS"
         };
 
-        var defaultStocks = defaultTickers.Select(t => new StockMetadata
-        {
-            Ticker = t,
-            Name = t.Replace(".NS", ""),
-            Sector = "NSE"
-        }).ToList();
-
-        context.StockMetadatas.AddRange(defaultStocks);
-        context.SaveChanges();
+        foreach(var t in defaultTickers) {
+            connection.Execute("INSERT INTO StockMetadatas (Ticker, Name, Sector) VALUES ($Ticker, $Name, 'NSE')", new { Ticker = t, Name = t.Replace(".NS", "") });
+        }
     }
 }
 

@@ -62,6 +62,8 @@ namespace backend.Models
         public bool IsHctMatch { get; set; }
         public bool IsLrhrMatch { get; set; }
         public string Strategy { get; set; } = "None"; // "HCT", "LRHR", "Both", "None"
+        public string Conviction { get; set; } = "None"; // "High", "Medium", "Low"
+        public string Logic { get; set; } = string.Empty;
 
         // Technical Indicators
         public double Jnsar { get; set; }
@@ -71,8 +73,17 @@ namespace backend.Models
         public double Fib618 { get; set; }
         public double Atr14 { get; set; }
         public bool IsVolatilityCoiled { get; set; }
+        public bool IsSqueezeFiring { get; set; }
+        public double Rsi14 { get; set; }
+        public double Adx14 { get; set; }
+        public double ZScore { get; set; }
         public double ProximityTo52WHigh { get; set; }
         public double VolumeScore { get; set; }
+        
+        // Prop Desk Metrics
+        public double PointOfControl { get; set; }
+        public double YtdVwap { get; set; }
+        public double ChandelierExit { get; set; }
         
         // Fundamentals
         public double EpsGrowthYoY { get; set; }
@@ -127,5 +138,8 @@ namespace backend.Models
         public double? Ema200 { get; set; }
         public double? Jnsar { get; set; }
         public double? Fib618 { get; set; }
+        public double? MacdLine { get; set; }
+        public double? MacdSignal { get; set; }
+        public double? MacdHistogram { get; set; }
     }
 }

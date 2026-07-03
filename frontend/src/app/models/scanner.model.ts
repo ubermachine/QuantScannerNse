@@ -7,6 +7,8 @@ export interface StockScanResult {
   isHctMatch: boolean;
   isLrhrMatch: boolean;
   strategy: string;
+  conviction: string;
+  logic: string;
 
   // Technical Indicators
   jnsar: number;
@@ -16,8 +18,16 @@ export interface StockScanResult {
   fib618: number;
   atr14: number;
   isVolatilityCoiled: boolean;
+  isSqueezeFiring: boolean;
+  rsi14: number;
+  adx14: number;
+  zScore: number;
   proximityTo52WHigh: number;
   volumeScore: number;
+  
+  pointOfControl: number;
+  ytdVwap: number;
+  chandelierExit: number;
 
   // Fundamentals
   epsGrowthYoY: number;
@@ -66,8 +76,11 @@ export interface ChartCandle {
   ema8?: number;
   ema21?: number;
   ema200?: number;
-  jnsar?: number;
-  fib618?: number;
+  jnsar: number | null;
+  fib618: number | null;
+  macdLine: number | null;
+  macdSignal: number | null;
+  macdHistogram: number | null;
 }
 
 export interface HistoricalChartResponse {

@@ -42,4 +42,12 @@ export class ScannerService {
   getFyersLoginUrl(): Observable<{ loginUrl: string }> {
     return this.http.get<{ loginUrl: string }>(`${this.apiUrl}/fyers/login`);
   }
+
+  getFyersStatus(): Observable<{ needsLogin: boolean }> {
+    return this.http.get<{ needsLogin: boolean }>(`${this.apiUrl}/fyers/status`);
+  }
+
+  getFyersOptions(ticker: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/fyers/options/${ticker}`);
+  }
 }

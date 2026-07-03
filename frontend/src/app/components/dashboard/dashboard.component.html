@@ -33,6 +33,14 @@
         Sync Cache
       </button>
 
+      <!-- FYERS Connect Trigger -->
+      <button (click)="triggerFyersLogin()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-blue-600/10">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Connect FYERS</span>
+      </button>
+
       <!-- Scan Trigger Button -->
       <button (click)="runScan()" [disabled]="isScanning" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-blue-600/10">
         <svg *ngIf="isScanning" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -52,18 +60,7 @@
     <span><strong>System Alert:</strong> Defensive regime active (Index < 200 DMA). Positional long trades have lower historical win-rates. Reduce capital allocations or hold high cash levels.</span>
   </div>
 
-  <!-- FYERS Connection Alert Banner -->
-  <div *ngIf="fyersNeedsLogin" class="bg-blue-950/20 border-b border-blue-900/40 px-6 py-2.5 text-xs text-blue-300 flex items-center justify-between gap-4">
-    <div class="flex items-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <span><strong>FYERS Integration:</strong> Login required to enable Option Flow (PCR, Skew) and Squeeze tracking for strategy matches.</span>
-    </div>
-    <button (click)="triggerFyersLogin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-lg transition shrink-0 shadow-lg shadow-blue-500/10 border border-blue-500/30">
-      Connect FYERS
-    </button>
-  </div>
+
 
   <!-- DB Sync Background Progress Indicator Bar -->
   <div *ngIf="syncStatus?.isRunning" class="bg-blue-950/20 border-b border-blue-900/40 px-6 py-3 flex items-center justify-between text-xs text-blue-300">
@@ -240,9 +237,18 @@
               </span>
             </div>
             <p class="text-xs text-slate-400 mt-1 font-medium">{{ selectedStock.name }}</p>
+            <div class="mt-3 flex flex-col gap-1.5 border-l-2 pl-3 py-1"
+                 [ngClass]="selectedStock.conviction === 'High' ? 'border-emerald-500' : (selectedStock.conviction === 'Medium' ? 'border-amber-400' : 'border-slate-700')">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold" [ngClass]="selectedStock.conviction === 'High' ? 'text-emerald-400' : (selectedStock.conviction === 'Medium' ? 'text-amber-400' : 'text-slate-400')">
+                  {{ selectedStock.conviction }} Conviction
+                </span>
+                <span class="text-[10px] text-slate-500">•</span>
+                <span class="text-xs font-bold text-sky-400">{{ selectedStock.strategy }} Strategy</span>
+              </div>
+              <p class="text-[11px] text-slate-400 italic leading-relaxed">{{ selectedStock.logic }}</p>
+            </div>
           </div>
-
-          <!-- Watchlist toggle in drawer header -->
           <button (click)="toggleWatchlist(selectedStock)" 
                   class="text-xs font-semibold px-4 py-1.5 rounded-xl border transition flex items-center gap-1.5"
                   [ngClass]="isWatchlisted(selectedStock.ticker) ? 'bg-amber-950/40 text-amber-400 border-amber-900/50 hover:bg-amber-900/20' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'">
@@ -275,8 +281,72 @@
           </div>
         </div>
 
+        <!-- Institutional Flow Card -->
+        <div class="grid grid-cols-3 gap-3 bg-slate-950/80 border border-slate-900 rounded-xl p-4 font-mono text-center mb-3">
+          <div class="flex flex-col border-r border-slate-900">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">POC (150d)</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.price > selectedStock.pointOfControl ? 'text-emerald-400' : 'text-rose-400'">
+              {{ selectedStock.pointOfControl | number:'1.2-2' }}
+            </span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.price > selectedStock.pointOfControl">Strong Support</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.price <= selectedStock.pointOfControl">Heavy Resistance</span>
+          </div>
+          <div class="flex flex-col border-r border-slate-900">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">YTD VWAP</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.price > selectedStock.ytdVwap ? 'text-sky-400' : 'text-slate-400'">
+              {{ selectedStock.ytdVwap | number:'1.2-2' }}
+            </span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.price > selectedStock.ytdVwap">Inst. Accumulation</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.price <= selectedStock.ytdVwap">Inst. Distribution</span>
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">CHANDELIER EXIT</span>
+            <span class="text-sm font-bold text-amber-500">
+              {{ selectedStock.chandelierExit | number:'1.2-2' }}
+            </span>
+            <span class="text-[9px] text-slate-600 mt-0.5">ATR Trailing Stop</span>
+          </div>
+        </div>
+
+        <!-- Quant Metrics Card -->
+        <div class="grid grid-cols-4 gap-3 bg-slate-950/80 border border-slate-900 rounded-xl p-4 font-mono text-center">
+          <div class="flex flex-col border-r border-slate-900">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">RSI (14)</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.rsi14 > 70 ? 'text-rose-500' : (selectedStock.rsi14 < 30 ? 'text-emerald-500' : 'text-slate-300')">
+              {{ selectedStock.rsi14 | number:'1.1-1' }}
+            </span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsi14 > 70">Overbought</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsi14 < 30">Oversold</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsi14 >= 30 && selectedStock.rsi14 <= 70">Neutral</span>
+          </div>
+          <div class="flex flex-col border-r border-slate-900">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">ADX (14)</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.adx14 > 25 ? 'text-sky-400' : 'text-slate-400'">
+              {{ selectedStock.adx14 | number:'1.1-1' }}
+            </span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.adx14 > 25">Strong Trend</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.adx14 <= 25">Weak Trend</span>
+          </div>
+          <div class="flex flex-col border-r border-slate-900">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">Z-SCORE</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.zScore > 2.5 || selectedStock.zScore < -2.5 ? 'text-amber-400' : 'text-slate-300'">
+              {{ selectedStock.zScore | number:'1.2-2' }}
+            </span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.zScore > 2.5 || selectedStock.zScore < -2.5">Overextended</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.zScore <= 2.5 && selectedStock.zScore >= -2.5">Mean Range</span>
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[10px] text-slate-500 font-bold mb-1">BB SQUEEZE</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.isSqueezeFiring ? 'text-fuchsia-400' : 'text-slate-500'">
+              {{ selectedStock.isSqueezeFiring ? 'FIRING' : 'NO' }}
+            </span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.isSqueezeFiring">Explosive Setup</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="!selectedStock.isSqueezeFiring">Normal Vol</span>
+          </div>
+        </div>
+
         <!-- Option Flow & Squeeze Metrics Card (F&O stocks only) -->
-        <div *ngIf="selectedStock.fyersOptionsFlow" class="border border-slate-900 bg-slate-950 p-4 rounded-xl flex flex-col gap-3">
+        <div class="border border-slate-900 bg-slate-950 p-4 rounded-xl flex flex-col gap-3">
           <div class="flex items-center justify-between border-b border-slate-900 pb-2">
             <span class="text-xs text-slate-400 font-bold tracking-wider uppercase flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -284,22 +354,33 @@
               </svg>
               FYERS Options Flow
             </span>
-            <span *ngIf="selectedStock.fyersOptionsFlow.needsLogin" class="text-[10px] text-amber-400 bg-amber-950/20 border border-amber-900/40 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-              Authentication Required
+            <span *ngIf="selectedStock.fyersOptionsFlow?.needsLogin || selectedStock.fyersOptionsFlow?.squeezeStatus === 'Fyers Unavailable' || selectedStock.fyersOptionsFlow?.squeezeStatus === 'Fyers Connection Error'" 
+                  class="text-[10px] text-amber-400 bg-amber-950/20 border border-amber-900/40 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+              {{ selectedStock.fyersOptionsFlow?.needsLogin ? 'Authentication Required' : 'Connection Failed' }}
             </span>
-            <span *ngIf="!selectedStock.fyersOptionsFlow.needsLogin" class="text-[10px] text-emerald-400 bg-emerald-950/20 border border-emerald-900/40 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+            <span *ngIf="selectedStock.fyersOptionsFlow && !selectedStock.fyersOptionsFlow.needsLogin && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Fyers Unavailable' && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Fyers Connection Error' && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Loading...' && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Error Loading'" 
+                  class="text-[10px] text-emerald-400 bg-emerald-950/20 border border-emerald-900/40 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
               Live Connection
             </span>
           </div>
 
-          <div *ngIf="selectedStock.fyersOptionsFlow.needsLogin" class="flex flex-col gap-2 py-1 items-center text-center">
-            <p class="text-xs text-slate-500">Connect your FYERS account to view dynamic option metrics.</p>
-            <button (click)="triggerFyersLogin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-xl transition w-full shadow-lg shadow-blue-500/10">
-              Link FYERS Account
+          <div *ngIf="!selectedStock.fyersOptionsFlow || selectedStock.fyersOptionsFlow.needsLogin || selectedStock.fyersOptionsFlow.squeezeStatus === 'Fyers Unavailable' || selectedStock.fyersOptionsFlow.squeezeStatus === 'Fyers Connection Error' || selectedStock.fyersOptionsFlow.squeezeStatus === 'Loading...' || selectedStock.fyersOptionsFlow.squeezeStatus === 'Error Loading' || selectedStock.fyersOptionsFlow.squeezeStatus === 'No Options Data'" 
+               class="flex flex-col gap-2 py-1 items-center text-center">
+            <p class="text-xs text-slate-500">
+              {{ selectedStock.fyersOptionsFlow?.squeezeStatus === 'Loading...' ? 'Fetching latest options chain...' : 'Data not currently loaded for this stock.' }}
+            </p>
+            <button (click)="populateOptionsData(selectedStock.ticker)" 
+                    [disabled]="selectedStock.fyersOptionsFlow?.squeezeStatus === 'Loading...'"
+                    class="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2 rounded-xl transition w-full shadow-lg shadow-slate-900/10 border border-slate-700">
+              {{ selectedStock.fyersOptionsFlow?.squeezeStatus === 'Loading...' ? 'Loading...' : 'Populate Options Analysis' }}
             </button>
           </div>
 
-          <div *ngIf="!selectedStock.fyersOptionsFlow.needsLogin" class="grid grid-cols-3 gap-3 text-center">
+          <div *ngIf="selectedStock.fyersOptionsFlow && !selectedStock.fyersOptionsFlow.needsLogin && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Fyers Unavailable' && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Fyers Connection Error' && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Loading...' && selectedStock.fyersOptionsFlow.squeezeStatus !== 'Error Loading' && selectedStock.fyersOptionsFlow.squeezeStatus !== 'No Options Data'" class="grid grid-cols-3 gap-3 text-center relative">
+            
+            <button (click)="populateOptionsData(selectedStock.ticker)" class="absolute -top-10 right-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] transition-colors border border-slate-700">
+              ↻ Refresh
+            </button>
             <div class="flex flex-col border-r border-slate-900">
               <span class="text-[10px] text-slate-500 font-bold mb-1">PUT/CALL RATIO</span>
               <span class="text-sm font-bold font-mono" 
