@@ -10,11 +10,12 @@ namespace backend.Models
         public string SizingModel { get; set; } = "Equal"; // "Equal" or "Risk-Based"
         public double RiskPerTradePercent { get; set; } = 1.0;
         public double PositionSizePercent { get; set; } = 10.0;
-        public double TransactionCostPercent { get; set; } = 0.05; // Brokerage & taxes in % (e.g. 0.05%)
-        public double SlippagePercent { get; set; } = 0.10; // Slippage in % (e.g. 0.10%)
-        public string Strategy { get; set; } = "Both"; // "HCT", "LRHR", "Both"
+        public double TransactionCostPercent { get; set; } = 0.05;
+        public double SlippagePercent { get; set; } = 0.10;
+        public string Strategy { get; set; } = "Both";
         public DateTime StartDate { get; set; } = DateTime.MinValue;
         public DateTime EndDate { get; set; } = DateTime.MaxValue;
+        public int MinScore { get; set; } = 0; // Minimum scanner score (0-80) required to enter a trade
     }
 
     public class PortfolioSimulationResult
@@ -120,5 +121,19 @@ namespace backend.Models
     public class BulkBacktestResponse
     {
         public List<StrategyPerformanceSummary> Strategies { get; set; } = new();
+    }
+
+    // Multi-strategy comparison result (for "All Strategies" mode)
+    public class MultiStrategySimulationResult
+    {
+        public List<StrategySimLine> Strategies { get; set; } = new();
+        public double StartingCapital { get; set; }
+    }
+
+    public class StrategySimLine
+    {
+        public string StrategyName { get; set; } = "";
+        public List<EquityCurvePoint> EquityCurve { get; set; } = new();
+        public PortfolioSimulationResult Summary { get; set; } = new();
     }
 }

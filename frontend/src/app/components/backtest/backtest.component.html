@@ -16,6 +16,7 @@
       <nav class="flex items-center gap-6 ml-8 pl-8 border-l border-slate-900">
         <a routerLink="/" routerLinkActive="text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="text-sm font-semibold text-slate-400 hover:text-white transition">Dashboard</a>
         <a routerLink="/backtest" routerLinkActive="text-blue-400" class="text-sm font-semibold text-slate-400 hover:text-white transition">Backtester</a>
+        <a routerLink="/sector" routerLinkActive="text-blue-400" class="text-sm font-semibold text-slate-400 hover:text-white transition">Sector Screener</a>
       </nav>
     </div>
   </header>
@@ -38,6 +39,11 @@
               class="text-xs font-semibold px-4 py-2 rounded-lg transition" 
               [ngClass]="activeModeTab === 'bulk' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
         Universe Scan
+      </button>
+      <button (click)="changeModeTab('indexRotation')" 
+              class="text-xs font-semibold px-4 py-2 rounded-lg transition" 
+              [ngClass]="activeModeTab === 'indexRotation' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+        Index Rotation
       </button>
     </div>
   </div>
@@ -133,19 +139,35 @@
                  class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
         </div>
 
+        <!-- Min Score Filter -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Min Scanner Score</span>
+            <span class="text-blue-400 font-mono font-bold">{{ request.minScore }}/80</span>
+          </div>
+          <input type="range" min="0" max="80" step="5" 
+                 [(ngModel)]="request.minScore" 
+                 class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+          <span class="text-[10px] text-slate-500">Only enter trades with score ≥ threshold (live scanner max: 80)</span>
+        </div>
+
         <div class="flex flex-col gap-1.5">
           <span class="text-xs text-slate-400 font-medium">Strategy Filter</span>
-          <select [(ngModel)]="request.strategy" 
+          <select [(ngModel)]="request.strategy"
                   class="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-600 transition">
             <option value="All">All Strategies</option>
-            <option value="Both">HCT + LRHR (Both)</option>
-            <option value="HCT">HCT Only (all HCT variants)</option>
-            <option value="LRHR">LRHR Only (all LRHR variants)</option>
             <option value="JustNifty Positional">JustNifty Positional</option>
-            <option value="Quant HCT Pullback">Quant HCT Pullback</option>
-            <option value="Quant LRHR Base">Quant LRHR Base</option>
             <option value="JustNifty HCT">JustNifty HCT</option>
             <option value="JustNifty LRHR">JustNifty LRHR</option>
+            <option value="HCT">HCT</option>
+            <option value="LRHR">LRHR</option>
+            <option value="MOMCON">MOMCON — Momentum Continuation</option>
+            <option value="VAL">VAL — Institutional Value</option>
+            <option value="VBO">VBO — Volatility Breakout</option>
+            <option value="MOMACC">MOMACC — Momentum + Accumulation</option>
+            <option value="CBO">CBO — Compression Breakout</option>
+            <option value="DPA">DPA — Deep Pullback Accumulation</option>
+            <option value="RSML">RSML — RS Momentum Leader</option>
           </select>
         </div>
 
@@ -265,13 +287,36 @@
               </div>
             </div>
 
-            <!-- Portfolio curve chart -->
-            <div *ngIf="hasRun && !isLoading && activeChartTab === 'portfolio'">
+            <!-- Portfolio curve chart (single strategy) -->
+            <div *ngIf="hasRun && !isLoading && !multiResults && activeChartTab === 'portfolio'">
               <app-tradingview-chart 
                 [data]="equityChartData" 
                 chartMode="equity" 
                 ticker="PORTFOLIO">
               </app-tradingview-chart>
+            </div>
+
+            <!-- Multi-strategy comparison chart (overlaid lines) -->
+            <div *ngIf="hasRun && !isLoading && multiResults && activeChartTab === 'portfolio'">
+              <app-tradingview-chart 
+                [multiData]="multiEquityData"
+                chartMode="equity"
+                ticker="STRATEGY COMPARISON">
+              </app-tradingview-chart>
+              <!-- Legend -->
+              <div class="flex flex-wrap gap-3 mt-3 px-2">
+                <div *ngFor="let st of multiResults; let i = index" 
+                     class="flex items-center gap-1.5 text-xs font-mono text-slate-400">
+                  <span class="w-3 h-0.5 rounded-full" 
+                        [style.background]="stratColors[i % stratColors.length]"></span>
+                  <span>{{ st.strategyName }}</span>
+                  <span [class.text-emerald-400]="st.summary.returnPercent >= 0"
+                        [class.text-rose-400]="st.summary.returnPercent < 0"
+                        class="font-bold">
+                    {{ st.summary.returnPercent >= 0 ? '+' : '' }}{{ st.summary.returnPercent | number:'1.1-1' }}%
+                  </span>
+                </div>
+              </div>
             </div>
 
             <!-- Stock marker chart -->
@@ -673,6 +718,72 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- MODE 4: INDEX ROTATION BACKTEST -->
+    <ng-container *ngIf="activeModeTab === 'indexRotation'">
+      <div class="xl:col-span-12 bg-[#090d16]/60 border border-slate-900 rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">Index Rotation Backtest</h2>
+          <button (click)="runIndexRotation()" [disabled]="isRotationLoading"
+                  class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition flex items-center gap-2">
+            <svg *ngIf="isRotationLoading" class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            {{ isRotationLoading ? 'Running...' : 'Run Rotation Backtest' }}
+          </button>
+        </div>
+
+        <!-- Results -->
+        <div *ngIf="rotationBtResult" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div class="bg-slate-950/40 rounded-xl p-4">
+            <span class="text-xs text-slate-500 uppercase">Strategy Return</span>
+            <div class="text-lg font-bold font-mono" [class.text-emerald-400]="rotationBtResult.returnPercent >= 0" [class.text-rose-400]="rotationBtResult.returnPercent < 0">
+              {{ rotationBtResult.returnPercent >= 0 ? '+' : '' }}{{ rotationBtResult.returnPercent | number:'1.2-2' }}%
+            </div>
+          </div>
+          <div class="bg-slate-950/40 rounded-xl p-4">
+            <span class="text-xs text-slate-500 uppercase">Nifty 50 (B&H)</span>
+            <div class="text-lg font-bold font-mono" [class.text-emerald-400]="rotationBtResult.niftyReturn >= 0" [class.text-rose-400]="rotationBtResult.niftyReturn < 0">
+              {{ rotationBtResult.niftyReturn >= 0 ? '+' : '' }}{{ rotationBtResult.niftyReturn | number:'1.2-2' }}%
+            </div>
+          </div>
+          <div class="bg-slate-950/40 rounded-xl p-4">
+            <span class="text-xs text-slate-500 uppercase">Max Drawdown</span>
+            <div class="text-lg font-bold font-mono text-rose-400">{{ rotationBtResult.maxDrawdown | number:'1.2-2' }}%</div>
+          </div>
+          <div class="bg-slate-950/40 rounded-xl p-4">
+            <span class="text-xs text-slate-500 uppercase">Trades</span>
+            <div class="text-lg font-bold font-mono text-white">{{ rotationBtResult.totalTrades }}</div>
+          </div>
+          <div class="bg-slate-950/40 rounded-xl p-4">
+            <span class="text-xs text-slate-500 uppercase">Win Rate</span>
+            <div class="text-lg font-bold font-mono text-indigo-400">{{ rotationBtResult.winRate }}%</div>
+          </div>
+        </div>
+
+        <!-- Trades table -->
+        <div *ngIf="rotationBtResult && rotationBtResult.trades.length > 0" class="max-h-[300px] overflow-y-auto">
+          <table class="w-full text-xs font-mono">
+            <thead><tr class="text-slate-500 border-b border-slate-900">
+              <th class="text-left py-2">Sector</th><th class="text-center py-2">Signal</th>
+              <th class="text-right py-2">Date</th><th class="text-right py-2">Price</th>
+              <th class="text-right py-2">Return</th><th class="text-right py-2">Days</th>
+            </tr></thead>
+            <tbody>
+              <tr *ngFor="let t of rotationBtResult.trades" class="border-b border-slate-900/50">
+                <td class="py-2 font-semibold text-slate-200">{{ t.sector }}</td>
+                <td class="py-2 text-center"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold" [class.text-emerald-400]="t.signal==='BUY'" [class.text-rose-400]="t.signal==='SELL'" [class.text-slate-400]="t.signal==='CLOSE'">{{ t.signal }}</span></td>
+                <td class="py-2 text-right text-slate-300">{{ t.date }}</td>
+                <td class="py-2 text-right text-slate-300">{{ t.price | number:'1.0-0' }}</td>
+                <td class="py-2 text-right" [class.text-emerald-400]="t.returnPct>=0" [class.text-rose-400]="t.returnPct<0"> {{ t.returnPct }}%</td>
+                <td class="py-2 text-right text-slate-300">{{ t.daysHeld }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </ng-container>

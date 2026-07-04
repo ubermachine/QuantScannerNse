@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ScanResponse, HistoricalChartResponse, WatchlistItem, SyncStatus, PortfolioRequest, PortfolioSimulationResult } from '../models/scanner.model';
+import { ScanResponse, HistoricalChartResponse, WatchlistItem, SyncStatus, PortfolioRequest, PortfolioSimulationResult, MultiStrategySimulationResult, SectorRotationResult } from '../models/scanner.model';
 
 @Injectable({
   providedIn: 'root'
@@ -37,6 +37,10 @@ export class ScannerService {
     return this.http.post<PortfolioSimulationResult>(`${this.apiUrl}/backtest/portfolio`, request);
   }
 
+  compareAllStrategies(request: PortfolioRequest): Observable<MultiStrategySimulationResult> {
+    return this.http.post<MultiStrategySimulationResult>(`${this.apiUrl}/backtest/compare-all`, request);
+  }
+
   getWatchlist(): Observable<WatchlistItem[]> {
     return this.http.get<WatchlistItem[]>(`${this.apiUrl}/watchlist`);
   }
@@ -59,5 +63,18 @@ export class ScannerService {
 
   getFyersOptions(ticker: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/fyers/options/${ticker}`);
+  }
+
+  // Sector screener API
+  syncSectors(): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/sector/sync`, {});
+  }
+
+  getSectorRotation(): Observable<SectorRotationResult> {
+    return this.http.get<SectorRotationResult>(`${this.apiUrl}/sector/rotation`);
+  }
+
+  runRotationBacktest(request: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/sector/rotation-backtest`, request);
   }
 }

@@ -115,6 +115,7 @@ export interface PortfolioRequest {
   transactionCostPercent: number;
   slippagePercent: number;
   strategy: string;
+  minScore: number;
   startDate?: string;
   endDate?: string;
 }
@@ -151,4 +152,76 @@ export interface PortfolioSimulationResult {
   losingTrades: number;
   trades: PortfolioTrade[];
   equityCurve: EquityCurvePoint[];
+}
+
+// Multi-strategy comparison response
+export interface MultiStrategySimulationResult {
+  strategies: StrategySimLine[];
+  startingCapital: number;
+}
+
+export interface StrategySimLine {
+  strategyName: string;
+  equityCurve: EquityCurvePoint[];
+  summary: PortfolioSimulationResult;
+}
+
+// Sector screener types
+export interface QuadrantSnapshot {
+  date: string;
+  quadrant: string;
+}
+
+export interface SectorRRGPoint {
+  ticker: string;
+  name: string;
+  rsRatio: number;
+  rsMomentum: number;
+  quadrant: string;
+  price: number;
+  priceChangePct: number;
+  isNewImproving: boolean;
+  isNewWeakening: boolean;
+  history: QuadrantSnapshot[];
+}
+
+export interface RotationSuggestion {
+  sector: string;
+  action: string;
+  from: string;
+  to: string;
+  daysSinceChange: number;
+  reason: string;
+}
+
+export interface SectorRotationResult {
+  sectors: SectorRRGPoint[];
+  suggestions: RotationSuggestion[];
+  rotationActive: boolean;
+  lastUpdated: string;
+}
+
+export interface RotationBacktestTrade {
+  sector: string;
+  signal: string;
+  date: string;
+  price: number;
+  returnPct: number;
+  daysHeld: number;
+}
+
+export interface RotationBacktestResult {
+  startingCapital: number;
+  endingCapital: number;
+  totalReturn: number;
+  returnPercent: number;
+  niftyReturn: number;
+  maxDrawdown: number;
+  totalTrades: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  trades: RotationBacktestTrade[];
+  equityCurve: EquityCurvePoint[];
+  niftyCurve: EquityCurvePoint[];
 }

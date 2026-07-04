@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using backend.Models;
@@ -28,6 +28,21 @@ namespace backend.Controllers
                 }
 
                 var result = await _backtestService.RunPortfolioSimulationAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("compare-all")]
+        public async Task<ActionResult<MultiStrategySimulationResult>> CompareAllStrategies([FromBody] PortfolioRequest request)
+        {
+            try
+            {
+                if (request == null) return BadRequest("Request body is required.");
+                var result = await _backtestService.RunAllStrategiesAsync(request);
                 return Ok(result);
             }
             catch (Exception ex)

@@ -1,4 +1,4 @@
-﻿using DuckDB.NET.Data;
+using DuckDB.NET.Data;
 using Dapper;
 using backend.Models;
 using backend.Services;
@@ -14,6 +14,7 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient<YahooFinanceService>();
 builder.Services.AddScoped<IndicatorService>();
 builder.Services.AddScoped<BacktestService>();
+builder.Services.AddScoped<SectorService>();
 builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.HctStrategy>();
 builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.LrhrStrategy>();
 builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.JustNiftyStrategy>();
@@ -22,6 +23,7 @@ builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.Just
 builder.Services.AddSingleton<FyersMcpService>();
 builder.Services.AddScoped<ScannerService>();
 builder.Services.AddScoped<BacktestService>();
+builder.Services.AddScoped<SectorService>();
 
 // Enable CORS for Angular frontend
 builder.Services.AddCors(options =>

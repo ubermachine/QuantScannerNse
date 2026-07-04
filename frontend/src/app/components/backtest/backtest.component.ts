@@ -6,11 +6,14 @@ import { ScannerService } from '../../services/scanner.service';
 import { TradingViewChartComponent } from '../tradingview-chart/tradingview-chart.component';
 import { 
   PortfolioRequest, 
-  PortfolioSimulationResult, 
-  PortfolioTrade, 
+  PortfolioSimulationResult,
+  PortfolioTrade,
+  MultiStrategySimulationResult,
+  StrategySimLine,
   EquityCurvePoint, 
   ChartCandle 
 } from '../../models/scanner.model';
+import { RotationBacktestResult } from '../../models/scanner.model';
 
 @Component({
   selector: 'app-backtest',
@@ -26,7 +29,7 @@ import {
 })
 export class BacktestComponent implements OnInit {
   // Navigation Tabs
-  activeModeTab: 'single' | 'bulk' | 'portfolio' = 'portfolio';
+  activeModeTab: 'single' | 'bulk' | 'portfolio' | 'indexRotation' = 'portfolio';
 
   // Portfolio Simulator State
   request: PortfolioRequest = {
@@ -38,18 +41,26 @@ export class BacktestComponent implements OnInit {
     transactionCostPercent: 0.05,
     slippagePercent: 0.10,
     strategy: 'All',
+    minScore: 40,
     startDate: '2023-01-01',
     endDate: '2026-07-01'
   };
   isLoading: boolean = false;
   hasRun: boolean = false;
   results: PortfolioSimulationResult | null = null;
+  isRotationLoading = false;
+  rotationBtResult: RotationBacktestResult | null = null;
+  multiResults: StrategySimLine[] | null = null;
   activeChartTab: 'portfolio' | 'stock' = 'portfolio';
   equityChartData: ChartCandle[] = [];
+  multiEquityData: { name: string; data: ChartCandle[] }[] = [];
   stockChartData: ChartCandle[] = [];
   stockChartTicker: string = '';
   stockMarkers: any[] = [];
   selectedTrade: PortfolioTrade | null = null;
+  // Color palette for strategy lines
+  stratColors = ['#6366f1','#10b981','#f59e0b','#ef4444','#ec4899',
+                         '#06b6d4','#a78bfa','#f97316','#22c55e'];
 
   // Single Stock Backtest State
   singleTicker: string = 'DRREDDY';
@@ -87,36 +98,62 @@ export class BacktestComponent implements OnInit {
     this.stockChartTicker = '';
     this.stockMarkers = [];
     this.activeChartTab = 'portfolio';
+    this.multiResults = null;
+    this.multiEquityData = [];
 
     const reqCopy = { ...this.request };
     
-    this.scannerService.runPortfolioSimulation(reqCopy).subscribe({
-      next: (res) => {
-        this.results = res;
-        this.isLoading = false;
-        
-        if (res.equityCurve && res.equityCurve.length > 0) {
-          this.equityChartData = res.equityCurve.map(pt => {
-            const dateStr = pt.date.includes('T') ? pt.date.split('T')[0] : pt.date;
-            return {
-              date: dateStr,
-              open: pt.balance,
-              high: pt.balance,
-              low: pt.balance,
-              close: pt.balance,
-              volume: 0,
-              jnsar: null,
-              fib618: null,
-              macdLine: null,
-              macdSignal: null,
-              macdHistogram: null
-            };
-          });
+    // If "All Strategies", use the compare-all endpoint
+    if (reqCopy.strategy === 'All') {
+      this.scannerService.compareAllStrategies(reqCopy).subscribe({
+        next: (res) => {
+          this.multiResults = res.strategies;
+          this.isLoading = false;
+
+          this.multiEquityData = res.strategies.map((s, i) => ({
+            name: s.strategyName,
+            data: (s.equityCurve || []).map((pt: any) => {
+              const dateStr = pt.date.includes('T') ? pt.date.split('T')[0] : pt.date;
+              return { date: dateStr, open: pt.balance, high: pt.balance, low: pt.balance, close: pt.balance, volume: 0, jnsar: null, fib618: null, macdLine: null, macdSignal: null, macdHistogram: null };
+            })
+          }));
+        },
+        error: (err) => {
+          console.error('Compare-all failed', err);
+          this.isLoading = false;
         }
+      });
+    } else {
+      this.scannerService.runPortfolioSimulation(reqCopy).subscribe({
+        next: (res) => {
+          this.results = res;
+          this.isLoading = false;
+          
+          if (res.equityCurve && res.equityCurve.length > 0) {
+            this.equityChartData = res.equityCurve.map(pt => {
+              const dateStr = pt.date.includes('T') ? pt.date.split('T')[0] : pt.date;
+              return { date: dateStr, open: pt.balance, high: pt.balance, low: pt.balance, close: pt.balance, volume: 0, jnsar: null, fib618: null, macdLine: null, macdSignal: null, macdHistogram: null };
+            });
+          }
+        },
+        error: (err) => {
+          console.error('Simulation failed', err);
+          this.isLoading = false;
+        }
+      });
+    }
+  }
+
+  runIndexRotation() {
+    this.isRotationLoading = true;
+    this.rotationBtResult = null;
+    this.scannerService.runRotationBacktest({ startingCapital: 1000000 }).subscribe({
+      next: (res: any) => {
+        this.rotationBtResult = res;
+        this.isRotationLoading = false;
       },
-      error: (err) => {
-        console.error('Simulation failed', err);
-        this.isLoading = false;
+      error: () => {
+        this.isRotationLoading = false;
       }
     });
   }
@@ -415,7 +452,7 @@ export class BacktestComponent implements OnInit {
     return { markers, trades };
   }
 
-  changeModeTab(tab: 'single' | 'bulk' | 'portfolio') {
+  changeModeTab(tab: 'single' | 'bulk' | 'portfolio' | 'indexRotation') {
     this.activeModeTab = tab;
   }
 }

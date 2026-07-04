@@ -1,0 +1,212 @@
+<div class="min-h-screen bg-[#080c14] text-slate-100 flex flex-col">
+  <!-- Header -->
+  <header class="border-b border-slate-900 bg-[#090d16]/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">SECTOR SCREENER</h1>
+        <p class="text-xs text-slate-500 font-medium tracking-wider">RELATIVE ROTATION GRAPH</p>
+      </div>
+      <nav class="flex items-center gap-6 ml-8 pl-8 border-l border-slate-900">
+        <a routerLink="/" routerLinkActive="text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="text-sm font-semibold text-slate-400 hover:text-white transition">Dashboard</a>
+        <a routerLink="/backtest" routerLinkActive="text-blue-400" class="text-sm font-semibold text-slate-400 hover:text-white transition">Backtester</a>
+        <a routerLink="/sector" routerLinkActive="text-blue-400" class="text-sm font-semibold text-blue-400 hover:text-white transition">Sector Screener</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Controls -->
+  <div class="bg-slate-950/60 border-b border-slate-900/60 px-6 py-3 flex items-center gap-4">
+    <button (click)="syncData()" [disabled]="isSyncing"
+            class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2">
+      <svg *ngIf="isSyncing" class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      {{ isSyncing ? 'Syncing...' : 'Sync Sector Data' }}
+    </button>
+    <button (click)="loadRotation()" [disabled]="isLoading"
+            class="bg-slate-800 hover:bg-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition">
+      Refresh
+    </button>
+    <span *ngIf="syncMessage" class="text-xs text-emerald-400">{{ syncMessage }}</span>
+  </div>
+
+  <main class="flex-1 p-6">
+
+    <!-- Error -->
+    <div *ngIf="error && !isLoading" class="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-6 text-center mb-6">
+      <p class="text-rose-400 text-sm">{{ error }}</p>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="isLoading" class="flex items-center justify-center py-20">
+      <svg class="animate-spin h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+    </div>
+
+    <!-- RRG Chart Area (CSS-based quadrants) -->
+    <div *ngIf="rotationResult && !isLoading" class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+      <!-- Left: RRG Quadrant Chart -->
+      <div class="xl:col-span-8 bg-[#090d16]/60 border border-slate-900 rounded-2xl p-6">
+        <h2 class="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          Relative Rotation Graph (RRG)
+        </h2>
+
+        <!-- Rotation Alert -->
+        <div *ngIf="rotationResult.rotationActive"
+             class="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+          <p class="text-yellow-400 text-xs font-bold uppercase tracking-wider">⚠ Sector Rotation Detected</p>
+          <p class="text-yellow-300/70 text-xs mt-1">Multiple sectors shifting quadrants simultaneously. Watch top Improving sectors for new leaders.</p>
+        </div>
+
+        <!-- Quadrant Grid -->
+        <div class="relative w-full aspect-square max-w-[600px] mx-auto border border-slate-800 rounded-xl bg-[#0a0e1a] overflow-hidden">
+          <!-- Quadrant labels -->
+          <div class="absolute top-2 left-3 text-[10px] text-blue-400 font-semibold uppercase">Improving</div>
+          <div class="absolute top-2 right-3 text-[10px] text-emerald-400 font-semibold uppercase">Leading</div>
+          <div class="absolute bottom-2 left-3 text-[10px] text-rose-400 font-semibold uppercase">Lagging</div>
+          <div class="absolute bottom-2 right-3 text-[10px] text-amber-400 font-semibold uppercase">Weakening</div>
+
+          <!-- Center crosshairs -->
+          <div class="absolute left-1/2 top-0 w-px h-full bg-slate-800/60"></div>
+          <div class="absolute top-1/2 left-0 h-px w-full bg-slate-800/60"></div>
+
+          <!-- Sector dots positioned by RS-Ratio (x) and RS-Momentum (y) -->
+          <ng-container *ngFor="let s of sectors">
+            <div class="absolute transition-all duration-500"
+                 [style.left.%]="((s.rsRatio + 3) / 6) * 100"
+                 [style.top.%]="100 - ((s.rsMomentum + 3) / 6) * 100"
+                 [title]="s.name + ' (' + s.quadrant + ')'">
+              <div class="w-2.5 h-2.5 rounded-full shadow-lg"
+                   [class.bg-emerald-400]="s.quadrant === 'Leading'"
+                   [class.bg-amber-400]="s.quadrant === 'Weakening'"
+                   [class.bg-rose-400]="s.quadrant === 'Lagging'"
+                   [class.bg-blue-400]="s.quadrant === 'Improving'">
+              </div>
+              <div class="absolute top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                <span class="text-[10px] font-mono font-bold text-slate-300" [class.text-emerald-300]="s.isNewImproving" [class.text-amber-300]="s.isNewWeakening">
+                  {{ s.name }}
+                </span>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- All sectors table -->
+        <div class="mt-6 max-h-[300px] overflow-y-auto">
+          <table class="w-full text-xs font-mono">
+            <thead>
+              <tr class="text-slate-500 border-b border-slate-900">
+                <th class="text-left py-2 px-2">Sector</th>
+                <th class="text-right py-2 px-2">RRG‑Ratio</th>
+                <th class="text-right py-2 px-2">RRG‑Mom</th>
+                <th class="text-center py-2 px-2">Quadrant</th>
+                <th class="text-right py-2 px-2">Price</th>
+                <th class="text-right py-2 px-2">1D%</th>
+                <th class="text-center py-2 px-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of sectors" class="border-b border-slate-900/50 hover:bg-slate-900/30">
+                <td class="py-2 px-2 font-semibold text-slate-200">{{ s.name }}</td>
+                <td class="py-2 px-2 text-right" [class.text-emerald-400]="s.rsRatio > 0" [class.text-rose-400]="s.rsRatio < 0">{{ s.rsRatio }}</td>
+                <td class="py-2 px-2 text-right" [class.text-emerald-400]="s.rsMomentum > 0" [class.text-rose-400]="s.rsMomentum < 0">{{ s.rsMomentum }}</td>
+                <td class="py-2 px-2 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                  [ngClass]="s.quadrant==='Leading' ? 'text-emerald-400 bg-emerald-500/10' : s.quadrant==='Weakening' ? 'text-amber-400 bg-amber-500/10' : s.quadrant==='Lagging' ? 'text-rose-400 bg-rose-500/10' : 'text-blue-400 bg-blue-500/10'">{{ s.quadrant }}</span></td>
+                <td class="py-2 px-2 text-right text-slate-300">{{ s.price | number:'1.0-0' }}</td>
+                <td class="py-2 px-2 text-right" [class.text-emerald-400]="s.priceChangePct >= 0" [class.text-rose-400]="s.priceChangePct < 0">{{ s.priceChangePct >= 0 ? '+' : '' }}{{ s.priceChangePct }}%</td>
+                <td class="py-2 px-2 text-center">
+                  <span *ngIf="s.isNewImproving" class="text-[10px] text-blue-400 font-bold">⬆ Improving</span>
+                  <span *ngIf="s.isNewWeakening" class="text-[10px] text-amber-400 font-bold">⬇ Weakening</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Suggestions Panel -->
+      <div *ngIf="rotationResult.suggestions.length > 0" class="xl:col-span-12 bg-[#090d16]/60 border border-slate-900 rounded-2xl p-5">
+        <h2 class="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+          Rotation Suggestions
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div *ngFor="let sug of rotationResult.suggestions"
+               class="p-4 rounded-xl border"
+               [ngClass]="sug.action === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : sug.action === 'REDUCE' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-rose-500/10 border-rose-500/30'">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-bold px-2 py-0.5 rounded"
+                    [ngClass]="sug.action === 'BUY' ? 'text-emerald-400 bg-emerald-500/20' : sug.action === 'REDUCE' ? 'text-amber-400 bg-amber-500/20' : 'text-rose-400 bg-rose-500/20'">{{ sug.action }}</span>
+              <span class="text-sm font-bold text-slate-200">{{ sug.sector }}</span>
+            </div>
+            <p class="text-xs text-slate-400">{{ sug.reason }}</p>
+            <p class="text-[10px] text-slate-500 mt-1">
+              {{ sug.from }} → {{ sug.to }} · {{ sug.daysSinceChange }}d ago
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Quadrant Cards -->
+      <div class="xl:col-span-4 flex flex-col gap-4">
+        <!-- Leaders -->
+        <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5">
+          <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Leaders ({{ leaders.length }})
+          </h3>
+          <div *ngFor="let s of leaders" class="flex justify-between items-center py-1.5 border-b border-emerald-500/10 last:border-0">
+            <span class="text-sm font-semibold text-slate-200">{{ s.name }}</span>
+            <span class="text-xs font-mono text-emerald-400">z{{ s.rsMomentum }}</span>
+          </div>
+          <div *ngIf="leaders.length === 0" class="text-xs text-slate-500 italic mt-2">No sectors in Leading quadrant</div>
+        </div>
+
+        <!-- Gaining (Improving) -->
+        <div class="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
+          <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span> Improving — Next Leaders ({{ gaining.length }})
+          </h3>
+          <div *ngFor="let s of gaining" class="flex justify-between items-center py-1.5 border-b border-blue-500/10 last:border-0">
+            <span class="text-sm font-semibold text-slate-200">{{ s.name }}</span>
+            <span class="text-xs font-mono text-blue-400">z{{ s.rsMomentum }}</span>
+          </div>
+          <div *ngIf="gaining.length === 0" class="text-xs text-slate-500 italic mt-2">No sectors improving yet</div>
+        </div>
+
+        <!-- Losing (Weakening) -->
+        <div class="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5">
+          <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span> Weakening <span class="text-slate-500">(Avoid)</span>
+          </h3>
+          <div *ngFor="let s of losing" class="flex justify-between items-center py-1.5 border-b border-amber-500/10 last:border-0">
+            <span class="text-sm font-semibold text-slate-200">{{ s.name }}</span>
+            <span class="text-xs font-mono text-amber-400">z{{ s.rsMomentum }}</span>
+          </div>
+          <div *ngIf="losing.length === 0" class="text-xs text-slate-500 italic mt-2">No sectors weakening</div>
+        </div>
+
+        <!-- Lagging -->
+        <div class="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-5">
+          <h3 class="text-xs font-bold text-rose-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-400"></span> Lagging <span class="text-slate-500">(Avoid)</span>
+          </h3>
+          <div *ngFor="let s of lagging" class="flex justify-between items-center py-1.5 border-b border-rose-500/10 last:border-0">
+            <span class="text-sm font-semibold text-slate-200">{{ s.name }}</span>
+            <span class="text-xs font-mono text-rose-400">z{{ s.rsMomentum }}</span>
+          </div>
+          <div *ngIf="lagging.length === 0" class="text-xs text-slate-500 italic mt-2">No sectors in lagging phase</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

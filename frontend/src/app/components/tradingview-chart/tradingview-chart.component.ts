@@ -19,9 +19,11 @@ export class TradingViewChartComponent implements OnInit, OnChanges, OnDestroy {
   @Input() ticker: string = '';
   @Input() chartMode: 'candlestick' | 'equity' = 'candlestick';
   @Input() markers: any[] = [];
+  @Input() multiData: { name: string; data: ChartCandle[] }[] = [];
 
   private chart: IChartApi | null = null;
   private equitySeries: any = null;
+  private multiEquitySeries: any[] = [];
   private candlestickSeries: any = null;
   private ema8Series: any = null;
   private ema21Series: any = null;
@@ -57,6 +59,7 @@ export class TradingViewChartComponent implements OnInit, OnChanges, OnDestroy {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
+    this.multiEquitySeries = [];
     if (this.chart) {
       this.chart.remove();
     }
@@ -102,13 +105,31 @@ export class TradingViewChartComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     if (this.chartMode === 'equity') {
-      this.equitySeries = this.chart.addSeries(AreaSeries, {
-        topColor: 'rgba(99, 102, 241, 0.35)',
-        bottomColor: 'rgba(16, 185, 129, 0.05)',
-        lineColor: '#6366f1',
-        lineWidth: 3,
-        title: 'Equity Balance'
-      });
+      // If multiData is provided, create one AreaSeries per strategy
+      if (this.multiData && this.multiData.length > 0) {
+        const colors = ['#6366f1','#10b981','#f59e0b','#ef4444','#ec4899',
+                        '#06b6d4','#a78bfa','#f97316','#22c55e'];
+        this.multiData.forEach((s, i) => {
+          const series = this.chart!.addSeries(AreaSeries, {
+            topColor: colors[i % colors.length] + '55',
+            bottomColor: colors[i % colors.length] + '11',
+            lineColor: colors[i % colors.length],
+            lineWidth: 2,
+            title: s.name
+          });
+          const areaData = s.data.map(d => ({ time: d.date, value: d.close }));
+          series.setData(areaData);
+          this.multiEquitySeries.push(series);
+        });
+      } else {
+        this.equitySeries = this.chart.addSeries(AreaSeries, {
+          topColor: 'rgba(99, 102, 241, 0.35)',
+          bottomColor: 'rgba(16, 185, 129, 0.05)',
+          lineColor: '#6366f1',
+          lineWidth: 3,
+          title: 'Equity Balance'
+        });
+      }
       
       this.chart.priceScale('right').applyOptions({
         scaleMargins: {
