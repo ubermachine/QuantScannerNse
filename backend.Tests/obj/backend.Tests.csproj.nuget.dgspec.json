@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\backend.Tests.csproj": {}
+    "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\backend.Tests.csproj": {}
   },
   "projects": {
-    "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\backend.Tests.csproj": {
+    "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\backend.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\backend.Tests.csproj",
+        "projectUniqueName": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\backend.Tests.csproj",
         "projectName": "backend.Tests",
-        "projectPath": "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\backend.Tests.csproj",
+        "projectPath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\backend.Tests.csproj",
         "packagesPath": "C:\\Users\\HP\\.nuget\\packages\\",
-        "outputPath": "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\obj\\",
+        "outputPath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\HP\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -26,8 +26,8 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "D:\\antigravity_sandbox\\Quantscanner\\backend\\backend.csproj": {
-                "projectPath": "D:\\antigravity_sandbox\\Quantscanner\\backend\\backend.csproj"
+              "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend\\backend.csproj": {
+                "projectPath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend\\backend.csproj"
               }
             }
           }
@@ -359,14 +359,14 @@
         }
       }
     },
-    "D:\\antigravity_sandbox\\Quantscanner\\backend\\backend.csproj": {
+    "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend\\backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\antigravity_sandbox\\Quantscanner\\backend\\backend.csproj",
+        "projectUniqueName": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend\\backend.csproj",
         "projectName": "backend",
-        "projectPath": "D:\\antigravity_sandbox\\Quantscanner\\backend\\backend.csproj",
+        "projectPath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend\\backend.csproj",
         "packagesPath": "C:\\Users\\HP\\.nuget\\packages\\",
-        "outputPath": "D:\\antigravity_sandbox\\Quantscanner\\backend\\obj\\",
+        "outputPath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\HP\\AppData\\Roaming\\NuGet\\NuGet.Config"

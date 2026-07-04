@@ -1,12 +1,13 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using System;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using backend.Models;
 using backend.Services;
 
 namespace backend.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/backtest")]
     public class BacktestController : ControllerBase
     {
         private readonly BacktestService _backtestService;
@@ -16,19 +17,23 @@ namespace backend.Controllers
             _backtestService = backtestService;
         }
 
-        [HttpPost("run")]
-        public async Task<IActionResult> RunBacktest([FromBody] BacktestRequest request)
+        [HttpPost("portfolio")]
+        public async Task<ActionResult<PortfolioSimulationResult>> RunPortfolioSimulation([FromBody] PortfolioRequest request)
         {
-            if (string.IsNullOrEmpty(request.Ticker)) return BadRequest("Ticker is required");
-            var result = await _backtestService.RunBacktestAsync(request.Ticker, request.StopLossPct, request.TargetPct, request.UseDynamicExits);
-            return Ok(result);
-        }
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("PortfolioRequest request body is required.");
+                }
 
-        [HttpPost("run-all")]
-        public async Task<IActionResult> RunAllBacktests([FromBody] BacktestRequest request)
-        {
-            var result = await _backtestService.RunAllBacktestsAsync(request.StopLossPct, request.TargetPct, request.UseDynamicExits);
-            return Ok(result);
+                var result = await _backtestService.RunPortfolioSimulationAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
         }
     }
 }

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "qsP/VpnlGh4=",
+  "dgSpecHash": "Mqsmd2/QfnE=",
   "success": true,
-  "projectFilePath": "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\backend.Tests.csproj",
+  "projectFilePath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\backend.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\HP\\.nuget\\packages\\coverlet.collector\\6.0.4\\coverlet.collector.6.0.4.nupkg.sha512",
     "C:\\Users\\HP\\.nuget\\packages\\dapper\\2.1.79\\dapper.2.1.79.nupkg.sha512",
@@ -29,9 +29,9 @@
       "code": "NU1903",
       "level": "Warning",
       "message": "Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc",
-      "projectPath": "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\backend.Tests.csproj",
+      "projectPath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\backend.Tests.csproj",
       "warningLevel": 1,
-      "filePath": "D:\\antigravity_sandbox\\Quantscanner\\backend.Tests\\backend.Tests.csproj",
+      "filePath": "C:\\Users\\HP\\.gemini\\antigravity\\brain\\74d6c58f-5a56-4f8d-a0d4-18c6c6de6f10\\.system_generated\\worktrees\\subagent-Backend-Engineer-self-c6d0c55b\\backend.Tests\\backend.Tests.csproj",
       "libraryId": "Microsoft.OpenApi",
       "targetGraphs": [
         "net10.0"

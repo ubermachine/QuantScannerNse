@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -20,12 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\backend\backend.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\backend\quantscanner.duckdb" Link="quantscanner.duckdb">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
