@@ -10,6 +10,7 @@ using DuckDB.NET.Data;
 using Dapper;
 using backend.Models;
 using Microsoft.AspNetCore.SignalR;
+using backend.Strategies;
 
 namespace backend.Services
 {
@@ -20,6 +21,7 @@ namespace backend.Services
         private readonly IndicatorService _indicatorService;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly FyersMcpService _fyersMcpService;
+        private readonly IEnumerable<IStrategy> _strategies;
 
         private static Dictionary<string, StockSeriesData>? _cachedDailyGroups;
         private static Dictionary<string, WeeklySeriesData>? _cachedWeeklyGroups;
@@ -30,15 +32,17 @@ namespace backend.Services
             YahooFinanceService yahooFinanceService,
             IndicatorService indicatorService,
             IServiceScopeFactory scopeFactory,
-            FyersMcpService fyersMcpService)
+            FyersMcpService fyersMcpService,
+            IEnumerable<IStrategy> strategies)
         {
             _yahooFinanceService = yahooFinanceService;
             _indicatorService = indicatorService;
             _scopeFactory = scopeFactory;
             _fyersMcpService = fyersMcpService;
+            _strategies = strategies;
         }
 
-        public async Task<ScanResponse> ExecuteScanAsync()
+        public async Task<ScanResponse> ExecuteScanAsync(string selectedStrategy = null)
         {
             var response = new ScanResponse();
 
@@ -164,6 +168,18 @@ namespace backend.Services
 
             var resultsBag = new ConcurrentBag<StockScanResult>();
 
+            // Pre-calculate 3M Returns for RS Percentile Ranking
+            var stockReturns = new Dictionary<string, double>();
+            foreach (var stock in stocks)
+            {
+                if (dailyGroups.TryGetValue(stock.Ticker, out var dData) && dData.Closes.Count >= 60)
+                {
+                    stockReturns[stock.Ticker] = _indicatorService.CalculateReturn(dData.Closes.ToArray(), 60);
+                }
+            }
+            var orderedReturns = stockReturns.Values.OrderBy(v => v).ToList();
+            int totalReturns = orderedReturns.Count;
+
             // 3. Scan stocks in parallel using memory dictionary lookups (takes < 20ms total across cores!)
             Parallel.ForEach(stocks, stock =>
             {
@@ -199,6 +215,9 @@ namespace backend.Services
                     var ema144w = _indicatorService.CalculateEma(weeklyCloses, 144);
                     var ema233w = _indicatorService.CalculateEma(weeklyCloses, 233);
                     var (wMacdLine, wMacdSignal) = _indicatorService.CalculateMacd(weeklyCloses);
+                    var dailyMacd = _indicatorService.CalculateMacd(dailyCloses);
+                    var macdLine = dailyMacd.MacdLine;
+                    var macdSignal = dailyMacd.SignalLine;
 
                     // ATR Volatility Contraction
                     var atr14 = _indicatorService.CalculateAtr(dailyHighs, dailyLows, dailyCloses, 14);
@@ -218,6 +237,19 @@ namespace backend.Services
                     double poc = _indicatorService.CalculatePointOfControl(dailyCloses, dailyVolumes);
                     double ytdVwap = _indicatorService.CalculateYtdVwap(dailyCloses, dailyHighs, dailyLows, dailyVolumes, dailyDates);
                     double chandelierExit = _indicatorService.CalculateChandelierExit(dailyHighs, dailyLows, dailyCloses);
+                    
+                    var obv = _indicatorService.CalculateObv(dailyCloses, dailyVolumes);
+                    var cmf = _indicatorService.CalculateCmf(dailyCloses, dailyHighs, dailyLows, dailyVolumes);
+                    var volPctRank = _indicatorService.CalculateVolatilityPercentileRank(atr14);
+                    var rsSharpe = _indicatorService.CalculateRollingSharpe(dailyCloses);
+
+                    double rsRank = 0;
+                    if (stockReturns.TryGetValue(stock.Ticker, out var ret))
+                    {
+                        int index = orderedReturns.BinarySearch(ret);
+                        if (index < 0) index = ~index;
+                        rsRank = totalReturns > 1 ? (index / (double)(totalReturns - 1)) * 100.0 : 50.0;
+                    }
 
                     // 52-Week High Proximity
                     double max52WHigh = dailyHighs.TakeLast(250).Max();
@@ -242,97 +274,133 @@ namespace backend.Services
                         stopLoss = chandelierExit;
                     }
 
-                    // --- SCORECARD SCORING ENGINE ---
+                    // --- SCORECARD SCORING ENGINE (Prop-Desk Grade, Tightened) ---
+
+                    // 1. TREND QUALITY (Max 20) — requires strong multi-timeframe alignment
                     int trendScore = 0;
                     if (currentPrice > ema50[^1]) trendScore += 5;
                     if (ema50[^1] > ema200[^1]) trendScore += 5;
-                    if (ema50[^1] > ema50[ema50.Length - 5]) trendScore += 5; // rising
-                    if (adx[^1] > 25) trendScore += 5; // ADX confirms strong trend
+                    if (ema50[^1] > ema50[ema50.Length - 5]) trendScore += 5; // 50 EMA actively rising
+                    if (adx[^1] > 25) trendScore += 5; // ADX trend strength confirmation
 
+                    // 2. RELATIVE STRENGTH (Max 20) — must outperform the index
                     int rsScore = 0;
                     double stockReturn3M = _indicatorService.CalculateReturn(dailyCloses, 60);
                     double stockReturn6M = _indicatorService.CalculateReturn(dailyCloses, 120);
                     if (stockReturn3M > indexReturn3M) rsScore += 10;
                     if (stockReturn6M > indexReturn6M) rsScore += 10;
 
+                    // 3. 52-WEEK PROXIMITY (Max 10) — tightened. Reward only stocks within 5% of 52W high.
                     int proximityScore = 0;
-                    if (discount52W <= 0.15) proximityScore = 15;
-                    else if (discount52W <= 0.25) proximityScore = 7;
+                    if (discount52W <= 0.05) proximityScore = 10;        // Tight VCP — within 5% of high
+                    else if (discount52W <= 0.10) proximityScore = 6;    // Acceptable — within 10%
+                    // Stocks >10% below 52W high get 0 proximity score (they have overhead resistance)
 
+                    // 4. VOLUME ACCUMULATION (Max 10)
                     int volScore = _indicatorService.CalculateVolumeScore(dailyCloses, dailyVolumes, 15);
                     int volumeAccumulationScore = volScore;
 
+                    // 5. VOLATILITY SETUP (Max 10) — coiling and squeeze firing
                     int volatilitySetupScore = isAtrCoiled ? 5 : 0;
-                    if (isSqueezeFiring) volatilitySetupScore += 5; // Squeeze adds conviction
+                    if (isSqueezeFiring) volatilitySetupScore += 5;
 
-                    // Standard rules: Positive EPS growth YoY, low D/E
-                    double epsGrowth = 15.0; // mock default
-                    double debtToEquity = 0.5; // mock default
-                    
-                    // Standard fundamentals score
-                    int fundamentalsScore = 0;
-                    if (epsGrowth > 0) fundamentalsScore += 10;
-                    if (debtToEquity < 1.5) fundamentalsScore += 5;
+                    // 6. MOMENTUM GATE (Max 10) — RSI between 50-70 is the golden zone: not exhausted, not dead
+                    int fundamentalsScore = 0; // Repurposed to Momentum Quality score
+                    double latestRsi = rsi[^1];
+                    if (latestRsi >= 50 && latestRsi <= 70) fundamentalsScore += 10; // Golden zone
+                    else if (latestRsi > 40 && latestRsi < 50) fundamentalsScore += 5;  // Recovering
+                    // RSI < 40 = downtrend (0), RSI > 70 = overbought (0)
 
-                    // Institutional Accumulation Proxy
-                    // Delivery volume proxy: If average volume of up days > down days
+                    // 7. INSTITUTIONAL FOOTPRINT (Max 10)
+                    // Up-day avg volume must be materially higher than down-day avg volume (1.5x threshold)
                     int instScore = 0;
-                    double avgUpVol = 0;
-                    double avgDownVol = 0;
-                    int upCount = 0;
-                    int downCount = 0;
-                    for (int i = dailyCloses.Length - 15; i < dailyCloses.Length; i++)
+                    double avgUpVol = 0, avgDownVol = 0;
+                    int upCount = 0, downCount = 0;
+                    int lookbackWindow = Math.Min(20, dailyCloses.Length - 1);
+                    for (int i = dailyCloses.Length - lookbackWindow; i < dailyCloses.Length; i++)
                     {
-                        if (dailyCloses[i] > dailyCloses[i - 1])
-                        {
-                            avgUpVol += dailyVolumes[i];
-                            upCount++;
-                        }
-                        else
-                        {
-                            avgDownVol += dailyVolumes[i];
-                            downCount++;
-                        }
+                        if (dailyCloses[i] > dailyCloses[i - 1]) { avgUpVol += dailyVolumes[i]; upCount++; }
+                        else { avgDownVol += dailyVolumes[i]; downCount++; }
                     }
                     if (upCount > 0) avgUpVol /= upCount;
                     if (downCount > 0) avgDownVol /= downCount;
-                    if (avgUpVol > avgDownVol) instScore = 10;
+                    if (avgUpVol > avgDownVol * 1.5) instScore = 10; // Must be 1.5x — not just marginally higher
+                    else if (avgUpVol > avgDownVol) instScore = 5;
                     int institutionalFootprintScore = instScore;
 
-                    // Aggregate score
-                    int totalScore = trendScore + rsScore + proximityScore + volumeAccumulationScore + volatilitySetupScore + fundamentalsScore + institutionalFootprintScore;
+                    // Aggregate score (Max = 80)
+                    // NOTE: proximityScore intentionally excluded — it creates a structural bias toward stocks near
+                    // their 52W highs, preventing LRHR deep-value setups from competing on score.
+                    // Proximity is enforced directly inside the HCT/LRHR strategy conditions instead.
+                    int totalScore = trendScore + rsScore + volumeAccumulationScore + volatilitySetupScore + fundamentalsScore + institutionalFootprintScore;
 
-                    // --- STRATEGY FILTERS ---
-                    // HCT Strategy Conditions
-                    bool isHct = currentPrice > ema200[^1] &&
-                                 ema8[^1] > ema21[^1] &&
-                                 currentPrice > ema10[^1] &&
-                                 currentPrice > jnsar[^1] &&
-                                 Math.Abs((currentPrice - fib618) / fib618) <= 0.02;
+                    double epsGrowth = 15.0; // kept for DTO compatibility
+                    double debtToEquity = 0.5; // kept for DTO compatibility
 
-                    // LRHR Strategy Conditions
-                    bool isLrhr = discount52W >= 0.30 &&
-                                  wMacdLine.Length > 0 && wMacdLine[^1] > wMacdSignal[^1] &&
-                                  (Math.Abs((currentPrice - ema144w[^1]) / ema144w[^1]) <= 0.05 ||
-                                   Math.Abs((currentPrice - ema233w[^1]) / ema233w[^1]) <= 0.05);
+                    var strategyContext = new StrategyContext
+                    {
+                        CurrentPrice = currentPrice,
+                        YtdVwap = ytdVwap,
+                        Poc = poc,
+                        Obv = obv,
+                        Cmf = cmf,
+                        VolPctRank = volPctRank,
+                        RsRank = rsRank,
+                        RsSharpe = rsSharpe,
+                        ZScore = zScore,
+                        ChandelierExit = chandelierExit,
+                        Discount52W = discount52W,
+                        
+                        // New variables passed in
+                        Ema8 = ema8[^1],
+                        Ema10 = ema10[^1],
+                        Ema21 = ema21[^1],
+                        Ema50 = ema50[^1],
+                        Ema200 = ema200[^1],
+                        Rsi14 = rsi[^1],
+                        MacdLine = macdLine[^1],
+                        MacdSignal = macdSignal[^1],
+                        Jnsar = jnsar[^1]
+                    };
 
+                    bool isHct = false;
+                    bool isLrhr = false;
                     string strategyName = "None";
-                    if (isHct && isLrhr) strategyName = "Both";
-                    else if (isHct) strategyName = "HCT";
-                    else if (isLrhr) strategyName = "LRHR";
-
-                    string conviction = totalScore >= 75 ? "High" : (totalScore >= 50 ? "Medium" : "Low");
-                    
-                    // Modify Conviction based on Quant Filters
-                    if (rsi[^1] > 75) conviction = "Low"; // Overbought exhaustion risk
-                    else if (isSqueezeFiring && totalScore >= 60) conviction = "High"; // Coiled for breakout
-                    else if (currentPrice > poc && currentPrice > ytdVwap && totalScore >= 60) conviction = "High"; // Institutional trend confirmation
-
                     string logic = "";
-                    if (isHct) logic += "Price tracking near JNSAR and 200 EMA with strong upside momentum. ";
-                    if (isLrhr) logic += "Significant discount with a bounce off 144w/233w weekly averages. ";
+                    var matchedStrategies = new List<string>();
+
+                    foreach (var strategy in _strategies)
+                    {
+                        if (!string.IsNullOrEmpty(selectedStrategy) && strategy.Name != selectedStrategy)
+                        {
+                            continue;
+                        }
+
+                        if (strategy.Evaluate(strategyContext))
+                        {
+                            matchedStrategies.Add(strategy.Name);
+                            logic += strategy.GetLogic(strategyContext) + " ";
+                            
+                            if (strategy.Name.Contains("HCT")) isHct = true;
+                            if (strategy.Name.Contains("LRHR")) isLrhr = true;
+                        }
+                    }
+
+                    if (matchedStrategies.Count == 0) strategyName = "None";
+                    else if (matchedStrategies.Count == 1) strategyName = matchedStrategies[0];
+                    else strategyName = "Both";
+                    
+                    // Prop-desk conviction thresholds (tightened from 75/50 to 65/45)
+                    string conviction = totalScore >= 65 ? "High" : (totalScore >= 45 ? "Medium" : "Low");
+                    
+                    // Override conviction with quant gates
+                    if (volPctRank > 80) conviction = "Low";  // Volatility expansion / panic
+                    else if (rsRank < 20) conviction = "Low"; // Extreme laggard
+                    else if (isSqueezeFiring && totalScore >= 55 && rsSharpe > 1.0) conviction = "High"; // Coiled breakout with good risk-adjusted returns
+                    else if (currentPrice > poc && currentPrice > ytdVwap && totalScore >= 55 && cmf[^1] > 0.1) conviction = "High"; // Strong institutional alignment
+
                     if (isSqueezeFiring) logic += "Bollinger bands contracted inside Keltner Channels (Squeeze Firing). ";
-                    if (adx[^1] > 25) logic += $"Strong directional trend confirmed by ADX ({Math.Round(adx[^1], 1)}). ";
+                    if (cmf[^1] > 0.1) logic += $"Strong Institutional Accumulation (CMF = {Math.Round(cmf[^1], 2)}). ";
                     if (currentPrice > poc) logic += "Trading above the 150-day Volume Point of Control (HVN support). ";
                     if (currentPrice > ytdVwap) logic += "Trending above Institutional YTD VWAP. ";
                     if (zScore > 2.5) logic += "WARNING: Statistically overextended (Z-Score > 2.5). ";
@@ -373,6 +441,11 @@ namespace backend.Services
                         PointOfControl = SafeRound(poc, 2),
                         YtdVwap = SafeRound(ytdVwap, 2),
                         ChandelierExit = SafeRound(chandelierExit, 2),
+                        Obv = SafeRound(obv.Length > 0 ? obv[^1] : 0, 0),
+                        Cmf = SafeRound(cmf.Length > 0 ? cmf[^1] : 0, 2),
+                        VolatilityPctRank = SafeRound(volPctRank, 1),
+                        RsSharpe = SafeRound(rsSharpe, 2),
+                        RsPercentileRank = SafeRound(rsRank, 1),
                         EpsGrowthYoY = epsGrowth,
                         DebtToEquity = debtToEquity,
                         StopLoss = SafeRound(stopLoss, 2),
@@ -551,6 +624,7 @@ namespace backend.Services
 
     public class StockSeriesData
     {
+        public List<double> Opens { get; } = new();
         public List<double> Closes { get; } = new();
         public List<double> Highs { get; } = new();
         public List<double> Lows { get; } = new();

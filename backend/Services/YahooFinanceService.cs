@@ -19,7 +19,7 @@ namespace backend.Services
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         }
 
-        public async Task<(List<DailyBar> Daily, List<WeeklyBar> Weekly)> FetchHistoricalDataAsync(string ticker, int daysToFetch = 400)
+        public async Task<(List<DailyBar> Daily, List<WeeklyBar> Weekly)> FetchHistoricalDataAsync(string ticker, int daysToFetch = 2500)
         {
             var dailyBars = new List<DailyBar>();
             var weeklyBars = new List<WeeklyBar>();
@@ -38,7 +38,7 @@ namespace backend.Services
                 }
 
                 // 2. Fetch Weekly Bars (we fetch more history for weekly to compute 144w and 233w EMAs, e.g. 5 years)
-                long startWeeklyUnix = DateTimeOffset.UtcNow.AddYears(-5).ToUnixTimeSeconds();
+                long startWeeklyUnix = DateTimeOffset.UtcNow.AddYears(-10).ToUnixTimeSeconds();
                 string weeklyUrl = $"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?period1={startWeeklyUnix}&period2={endUnix}&interval=1wk";
                 var weeklyJson = await FetchStringWithRetryAsync(weeklyUrl);
                 if (!string.IsNullOrEmpty(weeklyJson))

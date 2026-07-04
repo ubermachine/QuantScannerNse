@@ -13,6 +13,12 @@ builder.Services.AddControllers();
 // Register Services
 builder.Services.AddHttpClient<YahooFinanceService>();
 builder.Services.AddScoped<IndicatorService>();
+builder.Services.AddScoped<BacktestService>();
+builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.HctStrategy>();
+builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.LrhrStrategy>();
+builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.JustNiftyStrategy>();
+builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.JustNiftyHctStrategy>();
+builder.Services.AddScoped<backend.Strategies.IStrategy, backend.Strategies.JustNiftyLrhrStrategy>();
 builder.Services.AddSingleton<FyersMcpService>();
 builder.Services.AddScoped<ScannerService>();
 

@@ -21,6 +21,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isScanning: boolean = false;
   syncStatus: SyncStatus | null = null;
   searchTerm: string = '';
+  strategies: string[] = [];
+  selectedStrategy: string = '';
 
   
   // Watchlist addition fields
@@ -35,6 +37,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadWatchlist();
     this.checkSyncStatus();
+    this.scannerService.getStrategies().subscribe(s => this.strategies = s);
     this.runScan();
   }
 
@@ -46,7 +49,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   runScan() {
     this.isScanning = true;
-    this.scannerService.scan().subscribe({
+    this.scannerService.scan(this.selectedStrategy).subscribe({
       next: (res) => {
         this.scanResponse = res;
         this.applyFilter();
@@ -115,7 +118,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  changeTab(tab: 'all' | 'lrhr' | 'hct' | 'watchlist') {
+  changeTab(tab: 'all' | 'watchlist') {
     this.activeTab = tab;
     this.applyFilter();
     
@@ -131,20 +134,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
   applyFilter() {
     if (!this.scanResponse) return;
 
-    // Always show only high conviction stocks (Score >= 85)
-    let baseList = this.scanResponse.results.filter(r => r.score >= 85);
+    const all = this.scanResponse.results;
+    let baseList: StockScanResult[];
 
-    // Filter by Strategy Tab
-    if (this.activeTab === 'lrhr') {
-      baseList = baseList.filter(r => r.isLrhrMatch);
-    } else if (this.activeTab === 'hct') {
-      baseList = baseList.filter(r => r.isHctMatch);
-    } else if (this.activeTab === 'watchlist') {
-      const watchlistTickers = new Set(this.watchlist.map(w => w.ticker));
-      baseList = baseList.filter(r => watchlistTickers.has(r.ticker));
+    if (this.activeTab === 'watchlist') {
+      const watchlistTickers = this.watchlist.map(w => w.ticker);
+      baseList = all.filter(r => watchlistTickers.includes(r.ticker));
+    } else {
+      baseList = all;
     }
 
-    // Filter by Search Term
+    // Search filter applies across all tabs
     if (this.searchTerm.trim() !== '') {
       const term = this.searchTerm.toLowerCase();
       baseList = baseList.filter(r =>
@@ -195,7 +195,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.loadWatchlist();
       });
     } else {
-      this.scannerService.addToWatchlist(stock.ticker, stock.price).subscribe(() => {
+      const priceStr = window.prompt(`Enter your entry price for ${stock.ticker}:`, stock.price.toString());
+      if (priceStr === null) return; // User cancelled the prompt
+      const entryPrice = parseFloat(priceStr);
+      
+      if (isNaN(entryPrice)) {
+        alert("Invalid entry price entered.");
+        return;
+      }
+
+      this.scannerService.addToWatchlist(stock.ticker, entryPrice).subscribe(() => {
         this.loadWatchlist();
       });
     }
@@ -215,15 +224,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   getScoreColorClass(score: number): string {
-    if (score >= 80) return 'text-emerald-400 bg-emerald-950/40 border-emerald-900/60 shadow-emerald-500/5';
-    if (score >= 60) return 'text-sky-400 bg-sky-950/40 border-sky-900/60 shadow-sky-500/5';
-    if (score >= 40) return 'text-amber-400 bg-amber-950/40 border-amber-900/60 shadow-amber-500/5';
+    if (score >= 72) return 'text-emerald-400 bg-emerald-950/40 border-emerald-900/60 shadow-emerald-500/5';
+    if (score >= 54) return 'text-sky-400 bg-sky-950/40 border-sky-900/60 shadow-sky-500/5';
+    if (score >= 36) return 'text-amber-400 bg-amber-950/40 border-amber-900/60 shadow-amber-500/5';
     return 'text-rose-400 bg-rose-950/40 border-rose-900/60 shadow-rose-500/5';
   }
 
   get fyersNeedsLogin(): boolean {
     if (!this.scanResponse) return false;
-    return this.scanResponse.results.some(r => r.score >= 85 && (
+    return this.scanResponse.results.some(r => r.score >= 63 && (
       r.fyersOptionsFlow?.needsLogin === true ||
       r.fyersOptionsFlow?.squeezeStatus === 'Fyers Unavailable' ||
       r.fyersOptionsFlow?.squeezeStatus === 'Fyers Connection Error'

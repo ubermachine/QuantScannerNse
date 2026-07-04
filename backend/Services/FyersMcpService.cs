@@ -186,7 +186,7 @@ namespace backend.Services
                         var node = JsonNode.Parse(line);
                         if (node != null && node["id"] != null)
                         {
-                            long id = node["id"].GetValue<long>();
+                            long id = node["id"]!.GetValue<long>();
                             if (_pendingRequests.TryRemove(id, out var tcs))
                                 tcs.TrySetResult(line);
                         }
@@ -305,7 +305,7 @@ namespace backend.Services
                     var responseNode = JsonNode.Parse(responseJson);
                     var errorNode = responseNode?["error"];
                     var result = responseNode?["result"];
-                    var isResultError = result?["isError"] != null && result["isError"].GetValue<bool>();
+                    var isResultError = result?["isError"]?.GetValue<bool>() == true;
                     var textContent = result?["content"]?[0]?["text"]?.GetValue<string>();
 
                     bool isAuthError = false;

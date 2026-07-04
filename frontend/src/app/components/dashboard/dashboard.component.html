@@ -41,6 +41,12 @@
         <span>Connect FYERS</span>
       </button>
 
+      <!-- Strategy Selector -->
+      <select [(ngModel)]="selectedStrategy" class="bg-slate-900 border border-slate-800 text-slate-300 font-medium text-xs px-3 py-2 rounded-xl transition focus:outline-none focus:border-blue-600">
+        <option value="">All Strategies</option>
+        <option *ngFor="let s of strategies" [value]="s">{{ s }}</option>
+      </select>
+
       <!-- Scan Trigger Button -->
       <button (click)="runScan()" [disabled]="isScanning" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-blue-600/10">
         <svg *ngIf="isScanning" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -104,22 +110,12 @@
                  class="w-full pl-10 pr-4 py-2 text-sm bg-slate-950/80 border border-slate-800/80 rounded-xl focus:outline-none focus:border-blue-600 text-slate-200 placeholder-slate-500 transition" />
         </div>
 
-        <!-- Strategy Tabs selection -->
+        <!-- Watchlist Tab selection -->
         <div class="flex bg-slate-950/80 border border-slate-800/60 p-1 rounded-xl w-full md:w-auto">
           <button (click)="changeTab('all')" 
                   class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
                   [ngClass]="activeTab === 'all' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
-            All
-          </button>
-          <button (click)="changeTab('hct')" 
-                  class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
-                  [ngClass]="activeTab === 'hct' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
-            HCT Setup
-          </button>
-          <button (click)="changeTab('lrhr')" 
-                  class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
-                  [ngClass]="activeTab === 'lrhr' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
-            LRHR Value
+            Scan Results
           </button>
           <button (click)="changeTab('watchlist')" 
                   class="flex-1 md:flex-none text-xs font-semibold px-4 py-2 rounded-lg transition" 
@@ -138,6 +134,7 @@
                 <th class="px-5 py-4">Symbol / Name</th>
                 <th class="px-5 py-4 text-right">Price</th>
                 <th class="px-5 py-4 text-center">Score</th>
+                <th *ngIf="activeTab === 'watchlist'" class="px-5 py-4 text-right text-blue-400">Entry Price</th>
                 <th class="px-5 py-4 text-center">Strategy</th>
                 <th class="px-5 py-4 text-right">JNSAR Dist</th>
                 <th class="px-5 py-4 text-center">Actions</th>
@@ -167,6 +164,14 @@
                   <div class="inline-flex items-center justify-center font-bold font-mono h-8 w-8 rounded-lg text-xs border shadow-inner"
                        [ngClass]="getScoreColorClass(result.score)">
                     {{ result.score }}
+                  </div>
+                </td>
+
+                <!-- Entry Price & P&L (Watchlist Only) -->
+                <td *ngIf="activeTab === 'watchlist'" class="px-5 py-3.5 text-right font-mono font-semibold">
+                  <div class="text-white">{{ getWatchlistEntry(result.ticker) | number:'1.2-2' }}</div>
+                  <div *ngIf="getWatchlistPL(result) as pl" class="text-[10px] tracking-wide" [ngClass]="pl.value >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    {{ pl.percent >= 0 ? '+' : '' }}{{ pl.percent | number:'1.2-2' }}%
                   </div>
                 </td>
 
@@ -311,37 +316,39 @@
         <!-- Quant Metrics Card -->
         <div class="grid grid-cols-4 gap-3 bg-slate-950/80 border border-slate-900 rounded-xl p-4 font-mono text-center">
           <div class="flex flex-col border-r border-slate-900">
-            <span class="text-[10px] text-slate-500 font-bold mb-1">RSI (14)</span>
-            <span class="text-sm font-bold" [ngClass]="selectedStock.rsi14 > 70 ? 'text-rose-500' : (selectedStock.rsi14 < 30 ? 'text-emerald-500' : 'text-slate-300')">
-              {{ selectedStock.rsi14 | number:'1.1-1' }}
+            <span class="text-[10px] text-slate-500 font-bold mb-1">VOLATILITY RANK</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.volatilityPctRank < 30 ? 'text-emerald-500' : (selectedStock.volatilityPctRank > 70 ? 'text-rose-500' : 'text-slate-300')">
+              {{ selectedStock.volatilityPctRank | number:'1.1-1' }}%
             </span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsi14 > 70">Overbought</span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsi14 < 30">Oversold</span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsi14 >= 30 && selectedStock.rsi14 <= 70">Neutral</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.volatilityPctRank < 30">Highly Compressed</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.volatilityPctRank > 70">Expanded (Panic)</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.volatilityPctRank >= 30 && selectedStock.volatilityPctRank <= 70">Normal</span>
           </div>
           <div class="flex flex-col border-r border-slate-900">
-            <span class="text-[10px] text-slate-500 font-bold mb-1">ADX (14)</span>
-            <span class="text-sm font-bold" [ngClass]="selectedStock.adx14 > 25 ? 'text-sky-400' : 'text-slate-400'">
-              {{ selectedStock.adx14 | number:'1.1-1' }}
+            <span class="text-[10px] text-slate-500 font-bold mb-1">CHAIKIN MONEY FLOW</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.cmf > 0.05 ? 'text-emerald-400' : (selectedStock.cmf < -0.05 ? 'text-rose-400' : 'text-slate-400')">
+              {{ selectedStock.cmf > 0 ? '+' : '' }}{{ selectedStock.cmf | number:'1.2-2' }}
             </span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.adx14 > 25">Strong Trend</span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.adx14 <= 25">Weak Trend</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.cmf > 0.05">Inst. Inflow</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.cmf < -0.05">Inst. Outflow</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.cmf <= 0.05 && selectedStock.cmf >= -0.05">Neutral</span>
           </div>
           <div class="flex flex-col border-r border-slate-900">
-            <span class="text-[10px] text-slate-500 font-bold mb-1">Z-SCORE</span>
-            <span class="text-sm font-bold" [ngClass]="selectedStock.zScore > 2.5 || selectedStock.zScore < -2.5 ? 'text-amber-400' : 'text-slate-300'">
-              {{ selectedStock.zScore | number:'1.2-2' }}
+            <span class="text-[10px] text-slate-500 font-bold mb-1">ROLLING SHARPE</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.rsSharpe > 1.0 ? 'text-sky-400' : (selectedStock.rsSharpe < 0 ? 'text-rose-400' : 'text-slate-300')">
+              {{ selectedStock.rsSharpe | number:'1.2-2' }}
             </span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.zScore > 2.5 || selectedStock.zScore < -2.5">Overextended</span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.zScore <= 2.5 && selectedStock.zScore >= -2.5">Mean Range</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsSharpe > 1.0">High Risk-Adj Ret</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsSharpe < 0">Negative EV</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsSharpe >= 0 && selectedStock.rsSharpe <= 1.0">Average</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-[10px] text-slate-500 font-bold mb-1">BB SQUEEZE</span>
-            <span class="text-sm font-bold" [ngClass]="selectedStock.isSqueezeFiring ? 'text-fuchsia-400' : 'text-slate-500'">
-              {{ selectedStock.isSqueezeFiring ? 'FIRING' : 'NO' }}
+            <span class="text-[10px] text-slate-500 font-bold mb-1">RELATIVE STRENGTH</span>
+            <span class="text-sm font-bold" [ngClass]="selectedStock.rsPercentileRank > 70 ? 'text-fuchsia-400' : 'text-slate-500'">
+              {{ selectedStock.rsPercentileRank | number:'1.1-1' }} %ile
             </span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.isSqueezeFiring">Explosive Setup</span>
-            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="!selectedStock.isSqueezeFiring">Normal Vol</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsPercentileRank > 70">Market Leader</span>
+            <span class="text-[9px] text-slate-600 mt-0.5" *ngIf="selectedStock.rsPercentileRank <= 70">Market Laggard</span>
           </div>
         </div>
 

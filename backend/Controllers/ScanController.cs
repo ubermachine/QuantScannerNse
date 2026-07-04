@@ -7,6 +7,7 @@ using DuckDB.NET.Data;
 using Dapper;
 using backend.Models;
 using backend.Services;
+using backend.Strategies;
 
 namespace backend.Controllers
 {
@@ -26,29 +27,38 @@ namespace backend.Controllers
         private readonly string _conn = "Data Source=quantscanner.duckdb";
         private readonly IndicatorService _indicatorService;
         private readonly FyersMcpService _fyersMcpService;
+        private readonly IEnumerable<IStrategy> _strategies;
 
         public ScanController(
             ScannerService scannerService,
             IndicatorService indicatorService,
-            FyersMcpService fyersMcpService)
+            FyersMcpService fyersMcpService,
+            IEnumerable<IStrategy> strategies)
         {
             _scannerService = scannerService;
             _indicatorService = indicatorService;
             _fyersMcpService = fyersMcpService;
+            _strategies = strategies;
         }
 
         [HttpGet("scan")]
-        public async Task<ActionResult<ScanResponse>> Scan()
+        public async Task<ActionResult<ScanResponse>> Scan([FromQuery] string strategyName = null)
         {
             try
             {
-                var scanResult = await _scannerService.ExecuteScanAsync();
+                var scanResult = await _scannerService.ExecuteScanAsync(strategyName);
                 return Ok(scanResult);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { error = ex.Message });
             }
+        }
+
+        [HttpGet("scanner/strategies")]
+        public ActionResult<IEnumerable<string>> GetStrategies()
+        {
+            return Ok(_strategies.Select(s => s.Name).ToList());
         }
 
         [HttpGet("fyers/login")]

@@ -28,6 +28,11 @@ export interface StockScanResult {
   pointOfControl: number;
   ytdVwap: number;
   chandelierExit: number;
+  obv: number;
+  cmf: number;
+  volatilityPctRank: number;
+  rsSharpe: number;
+  rsPercentileRank: number;
 
   // Fundamentals
   epsGrowthYoY: number;

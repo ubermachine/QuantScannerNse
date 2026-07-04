@@ -1,0 +1,11 @@
+const fs = require('fs');
+let lines = fs.readFileSync('backend/Program.cs', 'utf8').split('\n');
+let newLines = lines.slice(0, 411);
+newLines.push('        foreach(var t in defaultTickers) {');
+newLines.push('            connection.Execute("INSERT INTO StockMetadatas (Ticker, Name, Sector) VALUES (@Ticker, @Name, \'NSE\')", new { Ticker = t, Name = t.Replace(".NS", "") });');
+newLines.push('        }');
+newLines.push('    }');
+newLines.push('}');
+newLines.push('');
+newLines.push('app.Run();');
+fs.writeFileSync('backend/Program.cs', newLines.join('\n'));

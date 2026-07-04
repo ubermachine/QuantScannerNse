@@ -11,8 +11,13 @@ export class ScannerService {
 
   constructor(private http: HttpClient) { }
 
-  scan(): Observable<ScanResponse> {
-    return this.http.get<ScanResponse>(`${this.apiUrl}/scan`);
+  scan(strategyName?: string): Observable<ScanResponse> {
+    const url = strategyName ? `${this.apiUrl}/scan?strategyName=${strategyName}` : `${this.apiUrl}/scan`;
+    return this.http.get<ScanResponse>(url);
+  }
+
+  getStrategies(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/scanner/strategies`);
   }
 
   startSync(): Observable<any> {

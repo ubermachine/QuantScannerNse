@@ -84,6 +84,11 @@ namespace backend.Models
         public double PointOfControl { get; set; }
         public double YtdVwap { get; set; }
         public double ChandelierExit { get; set; }
+        public double Obv { get; set; }
+        public double Cmf { get; set; }
+        public double VolatilityPctRank { get; set; }
+        public double RsSharpe { get; set; }
+        public double RsPercentileRank { get; set; }
         
         // Fundamentals
         public double EpsGrowthYoY { get; set; }

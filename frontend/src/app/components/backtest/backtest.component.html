@@ -1,0 +1,171 @@
+<div class="p-6 max-w-7xl mx-auto w-full h-full overflow-y-auto">
+  <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-6 shadow-xl mb-6">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-white">Backtesting Engine</h2>
+    </div>
+
+    <!-- Mode Selector Tabs -->
+    <div class="flex border-b border-slate-900 mb-6">
+      <button (click)="switchMode('single')" [class.border-blue-500]="mode === 'single'" [class.text-blue-500]="mode === 'single'" class="px-6 py-3 font-semibold text-sm border-b-2 border-transparent transition text-slate-400 hover:text-slate-200">
+        Single Stock Simulation
+      </button>
+      <button (click)="switchMode('bulk')" [class.border-blue-500]="mode === 'bulk'" [class.text-blue-500]="mode === 'bulk'" class="px-6 py-3 font-semibold text-sm border-b-2 border-transparent transition text-slate-400 hover:text-slate-200">
+        All Stocks Simulation (Bulk)
+      </button>
+    </div>
+
+    <div class="flex flex-wrap gap-4 items-end">
+      <div *ngIf="mode === 'single'" class="flex flex-col">
+        <label class="text-xs text-slate-400 mb-1">Ticker</label>
+        <input type="text" [(ngModel)]="ticker" class="bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-44" />
+      </div>
+      <div class="flex flex-col" [class.opacity-40]="useDynamicExits">
+        <label class="text-xs text-slate-400 mb-1">Stop Loss %</label>
+        <input type="number" [(ngModel)]="stopLossPct" [disabled]="useDynamicExits" class="bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-28 transition" />
+      </div>
+      <div class="flex flex-col" [class.opacity-40]="useDynamicExits">
+        <label class="text-xs text-slate-400 mb-1">Target %</label>
+        <input type="number" [(ngModel)]="targetPct" [disabled]="useDynamicExits" class="bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-28 transition" />
+      </div>
+      <div class="flex items-center gap-2 h-[38px] mb-0.5">
+        <input type="checkbox" id="useDynamicExits" [(ngModel)]="useDynamicExits" class="w-4 h-4 rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500" />
+        <label for="useDynamicExits" class="text-sm font-semibold text-slate-300 cursor-pointer select-none">Use Strategy Dynamic Exits</label>
+      </div>
+      <button *ngIf="mode === 'single'" (click)="runBacktest()" [disabled]="isSimulating" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-6 py-2 rounded font-bold text-white transition h-[38px]">
+        {{ isSimulating ? 'Simulating...' : 'Run Simulation' }}
+      </button>
+      <button *ngIf="mode === 'bulk'" (click)="runBulkBacktest()" [disabled]="isSimulating" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-6 py-2 rounded font-bold text-white transition h-[38px]">
+        {{ isSimulating ? 'Simulating All...' : 'Run Bulk Simulation' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- SINGLE STOCK RESULTS -->
+  <ng-container *ngIf="mode === 'single' && result">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+      <div class="bg-slate-950 border border-slate-900 rounded-xl p-5 text-center">
+        <span class="text-xs text-slate-400 font-bold">WIN RATE</span>
+        <p class="text-3xl font-mono mt-2" [ngClass]="result.winRate > 50 ? 'text-emerald-400' : 'text-rose-400'">
+          {{ result.winRate | number:'1.1-1' }}%
+        </p>
+      </div>
+      <div class="bg-slate-950 border border-slate-900 rounded-xl p-5 text-center">
+        <span class="text-xs text-slate-400 font-bold">PROFIT FACTOR</span>
+        <p class="text-3xl font-mono mt-2 text-sky-400">{{ result.profitFactor | number:'1.2-2' }}</p>
+      </div>
+      <div class="bg-slate-950 border border-slate-900 rounded-xl p-5 text-center">
+        <span class="text-xs text-slate-400 font-bold">TOTAL TRADES</span>
+        <p class="text-3xl font-mono mt-2 text-white">{{ result.totalTrades }}</p>
+      </div>
+      <div class="bg-slate-950 border border-slate-900 rounded-xl p-5 text-center">
+        <span class="text-xs text-slate-400 font-bold">MAX DRAWDOWN</span>
+        <p class="text-3xl font-mono mt-2 text-rose-400">-{{ result.maxDrawdown | number:'1.2-2' }}%</p>
+      </div>
+    </div>
+
+    <div *ngIf="result?.trades?.length" class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
+      <table class="w-full text-left">
+        <thead class="bg-slate-950/40 border-b border-slate-900 text-slate-400 text-xs uppercase">
+          <tr>
+            <th class="px-5 py-4">Strategy</th>
+            <th class="px-5 py-4">Entry Date</th>
+            <th class="px-5 py-4 text-right">Entry Price</th>
+            <th class="px-5 py-4">Exit Date</th>
+            <th class="px-5 py-4 text-right">Exit Price</th>
+            <th class="px-5 py-4 text-center">Days Held</th>
+            <th class="px-5 py-4 text-right">P&L %</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-900/60">
+          <tr *ngFor="let trade of result.trades" class="hover:bg-slate-900/30">
+            <td class="px-5 py-3 font-bold" [ngClass]="trade.strategy === 'HCT' ? 'text-indigo-400' : 'text-teal-400'">{{ trade.strategy }}</td>
+            <td class="px-5 py-3 text-sm text-slate-300">{{ trade.entryDate | date:'mediumDate' }}</td>
+            <td class="px-5 py-3 text-sm text-right font-mono text-slate-300">{{ trade.entryPrice | number:'1.2-2' }}</td>
+            <td class="px-5 py-3 text-sm text-slate-300">{{ trade.exitDate | date:'mediumDate' }}</td>
+            <td class="px-5 py-3 text-sm text-right font-mono text-slate-300">{{ trade.exitPrice | number:'1.2-2' }}</td>
+            <td class="px-5 py-3 text-sm text-center text-slate-300">{{ trade.daysHeld }}</td>
+            <td class="px-5 py-3 text-sm text-right font-bold" [ngClass]="trade.isWin ? 'text-emerald-400' : 'text-rose-400'">
+              {{ trade.profitPercentage >= 0 ? '+' : '' }}{{ trade.profitPercentage | number:'1.2-2' }}%
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+
+  <!-- BULK ALL STOCK RESULTS -->
+  <ng-container *ngIf="mode === 'bulk' && bulkResult">
+    <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl overflow-hidden shadow-xl mb-6">
+      <div class="px-6 py-4 bg-slate-950/40 border-b border-slate-900">
+        <h3 class="font-bold text-lg text-white">Strategy Performance Summary (Across All Symbols)</h3>
+      </div>
+      <table class="w-full text-left">
+        <thead class="bg-slate-950/25 border-b border-slate-900 text-slate-400 text-xs uppercase">
+          <tr>
+            <th class="px-5 py-4">Strategy Name</th>
+            <th class="px-5 py-4 text-center">Total Trades</th>
+            <th class="px-5 py-4 text-center">Win Rate</th>
+            <th class="px-5 py-4 text-center">Avg Profit Factor</th>
+            <th class="px-5 py-4 text-center">Max Drawdown</th>
+            <th class="px-5 py-4 text-right">Avg Return / Symbol</th>
+            <th class="px-5 py-4 text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-900/60">
+          <tr *ngFor="let s of bulkResult.strategies" [class.bg-indigo-950]="selectedStrategy?.strategyName === s.strategyName" class="hover:bg-slate-900/30 transition">
+            <td class="px-5 py-4 font-bold text-white">{{ s.strategyName }}</td>
+            <td class="px-5 py-4 text-center font-mono text-slate-300">{{ s.totalTrades }}</td>
+            <td class="px-5 py-4 text-center font-mono text-slate-300">{{ s.winRate | number:'1.1-1' }}%</td>
+            <td class="px-5 py-4 text-center font-mono text-sky-400">{{ s.profitFactor | number:'1.2-2' }}</td>
+            <td class="px-5 py-4 text-center font-mono text-rose-400">-{{ s.maxDrawdown | number:'1.2-2' }}%</td>
+            <td class="px-5 py-4 text-right font-mono font-bold" [ngClass]="s.totalReturn >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ s.totalReturn >= 0 ? '+' : '' }}{{ s.totalReturn | number:'1.2-2' }}%
+            </td>
+            <td class="px-5 py-4 text-center">
+              <button (click)="selectStrategy(s)" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded transition">
+                View Details
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Ticker Details Breakdown for selected strategy -->
+    <div *ngIf="selectedStrategy" class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
+      <div class="px-6 py-4 bg-slate-950/40 border-b border-slate-900">
+        <h3 class="font-bold text-lg text-white">
+          Ticker Performance Breakdown: <span class="text-indigo-400">{{ selectedStrategy.strategyName }}</span>
+        </h3>
+      </div>
+      <div class="max-h-[600px] overflow-y-auto">
+        <table class="w-full text-left">
+          <thead class="sticky top-0 bg-slate-950 border-b border-slate-900 text-slate-400 text-xs uppercase z-10">
+            <tr>
+              <th class="px-5 py-4">Ticker</th>
+              <th class="px-5 py-4 text-center">Total Trades</th>
+              <th class="px-5 py-4 text-center">Win Rate</th>
+              <th class="px-5 py-4 text-center">Profit Factor</th>
+              <th class="px-5 py-4 text-center">Max Drawdown</th>
+              <th class="px-5 py-4 text-right">Total Return</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-900/60">
+            <tr *ngFor="let tp of selectedStrategy.tickerPerformances" class="hover:bg-slate-900/30">
+              <td class="px-5 py-3 font-bold text-slate-200">{{ tp.ticker }}</td>
+              <td class="px-5 py-3 text-sm text-center font-mono text-slate-400">{{ tp.totalTrades }}</td>
+              <td class="px-5 py-3 text-sm text-center font-mono text-slate-300" [ngClass]="tp.winRate >= 50 ? 'text-emerald-400' : 'text-slate-300'">
+                {{ tp.winRate | number:'1.1-1' }}%
+              </td>
+              <td class="px-5 py-3 text-sm text-center font-mono text-sky-400">{{ tp.profitFactor | number:'1.2-2' }}</td>
+              <td class="px-5 py-3 text-sm text-center font-mono text-rose-400">-{{ tp.maxDrawdown | number:'1.2-2' }}%</td>
+              <td class="px-5 py-3 text-sm text-right font-bold font-mono" [ngClass]="tp.totalReturn >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                {{ tp.totalReturn >= 0 ? '+' : '' }}{{ tp.totalReturn | number:'1.2-2' }}%
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</div>

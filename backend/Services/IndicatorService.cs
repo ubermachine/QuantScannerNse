@@ -378,7 +378,7 @@ namespace backend.Services
         {
             int length = closes.Length;
             double[] adx = new double[length];
-            if (length <= period) return adx;
+            if (length < period * 2) return adx;
 
             double[] tr = new double[length];
             double[] plusDm = new double[length];
@@ -582,6 +582,206 @@ namespace backend.Services
             var (atrLast, _) = CalculateAtrLastAndAvg60(highs, lows, closes, period);
             
             return highestHigh - (atrLast * multiplier);
+        }
+        // ─── INSTITUTIONAL INDICATORS (OBV, CMF, Volatility PctRank, Sharpe) ────
+
+        public double[] CalculateObv(double[] closes, double[] volumes)
+        {
+            int length = closes.Length;
+            double[] obv = new double[length];
+            if (length == 0) return obv;
+
+            obv[0] = volumes[0]; // Or 0, but starting with volume is fine
+            for (int i = 1; i < length; i++)
+            {
+                if (closes[i] > closes[i - 1])
+                    obv[i] = obv[i - 1] + volumes[i];
+                else if (closes[i] < closes[i - 1])
+                    obv[i] = obv[i - 1] - volumes[i];
+                else
+                    obv[i] = obv[i - 1];
+            }
+            return obv;
+        }
+
+        public double[] CalculateCmf(double[] closes, double[] highs, double[] lows, double[] volumes, int period = 21)
+        {
+            int length = closes.Length;
+            double[] cmf = new double[length];
+            if (length < period) return cmf;
+
+            double[] moneyFlowVolume = new double[length];
+            for (int i = 0; i < length; i++)
+            {
+                double highLowRange = highs[i] - lows[i];
+                double moneyFlowMultiplier = 0;
+                if (highLowRange > 0)
+                {
+                    moneyFlowMultiplier = ((closes[i] - lows[i]) - (highs[i] - closes[i])) / highLowRange;
+                }
+                moneyFlowVolume[i] = moneyFlowMultiplier * volumes[i];
+            }
+
+            for (int i = period - 1; i < length; i++)
+            {
+                double sumMfv = 0;
+                double sumVol = 0;
+                for (int j = 0; j < period; j++)
+                {
+                    sumMfv += moneyFlowVolume[i - j];
+                    sumVol += volumes[i - j];
+                }
+                cmf[i] = sumVol > 0 ? sumMfv / sumVol : 0;
+            }
+            return cmf;
+        }
+
+        public double CalculateVolatilityPercentileRank(double[] atr, int period = 252)
+        {
+            int length = atr.Length;
+            if (length == 0) return 0;
+            double currentAtr = atr[^1];
+            
+            int lookback = Math.Min(length, period);
+            if (lookback < 2) return 50.0; // Default if not enough history
+            
+            int rankCount = 0;
+            for (int i = length - lookback; i < length; i++)
+            {
+                if (currentAtr > atr[i]) rankCount++;
+            }
+            return (rankCount / (double)(lookback - 1)) * 100.0;
+        }
+
+        public double CalculateRollingSharpe(double[] closes, int period = 63, double riskFreeRate = 0.0)
+        {
+            int length = closes.Length;
+            if (length <= period) return 0;
+
+            // Calculate daily returns for the period
+            double[] returns = new double[period];
+            for (int i = 0; i < period; i++)
+            {
+                int idx = length - period + i;
+                returns[i] = (closes[idx] - closes[idx - 1]) / closes[idx - 1];
+            }
+
+            double meanReturn = returns.Average();
+            double sumOfSquaresOfDifferences = returns.Select(val => (val - meanReturn) * (val - meanReturn)).Sum();
+            double stdDev = Math.Sqrt(sumOfSquaresOfDifferences / period);
+
+            if (stdDev == 0) return 0;
+
+            // Annualize
+            return ((meanReturn - (riskFreeRate / 252.0)) / stdDev) * Math.Sqrt(252);
+        }
+
+        // ─── INDEX-BASED OVERLOADS FOR HIGH-PERFORMANCE BACKTESTING ───────────────────
+        
+        public double CalculatePointOfControlAt(double[] closes, double[] volumes, int endIndex, int lookbackPeriod = 150)
+        {
+            if (closes.Length == 0) return 0;
+            int startIdx = Math.Max(0, endIndex - lookbackPeriod + 1);
+            double minPrice = closes[startIdx];
+            double maxPrice = closes[startIdx];
+            
+            for (int i = startIdx; i <= endIndex; i++)
+            {
+                if (closes[i] < minPrice) minPrice = closes[i];
+                if (closes[i] > maxPrice) maxPrice = closes[i];
+            }
+
+            if (minPrice == maxPrice) return minPrice;
+
+            int numBins = 20;
+            double binSize = (maxPrice - minPrice) / numBins;
+            if (binSize == 0) return minPrice;
+
+            double[] volumeBins = new double[numBins];
+            
+            for (int i = startIdx; i <= endIndex; i++)
+            {
+                int binIdx = (int)((closes[i] - minPrice) / binSize);
+                if (binIdx >= numBins) binIdx = numBins - 1;
+                volumeBins[binIdx] += volumes[i];
+            }
+
+            int maxVolBin = 0;
+            double maxVol = 0;
+            for (int i = 0; i < numBins; i++)
+            {
+                if (volumeBins[i] > maxVol)
+                {
+                    maxVol = volumeBins[i];
+                    maxVolBin = i;
+                }
+            }
+
+            return minPrice + (maxVolBin * binSize) + (binSize / 2);
+        }
+
+        public double CalculateChandelierExitAt(double[] highs, double[] lows, double[] atr, int endIndex, int period = 22, double multiplier = 3.0)
+        {
+            if (endIndex < period - 1 || atr.Length <= endIndex) return 0;
+            double highestHigh = highs[endIndex - period + 1];
+            for (int i = endIndex - period + 2; i <= endIndex; i++)
+            {
+                if (highs[i] > highestHigh) highestHigh = highs[i];
+            }
+            return highestHigh - (atr[endIndex] * multiplier);
+        }
+
+        public double CalculateZScoreAt(double[] closes, int endIndex, int period = 50)
+        {
+            if (endIndex < period - 1) return 0;
+            
+            double sum = 0;
+            for (int j = 0; j < period; j++) sum += closes[endIndex - j];
+            double mean = sum / period;
+
+            double variance = 0;
+            for (int j = 0; j < period; j++) variance += Math.Pow(closes[endIndex - j] - mean, 2);
+            double stdDev = Math.Sqrt(variance / period);
+
+            if (stdDev == 0) return 0;
+            return (closes[endIndex] - mean) / stdDev;
+        }
+
+        public double CalculateVolatilityPercentileRankAt(double[] atr, int endIndex, int period = 252)
+        {
+            if (atr.Length == 0 || endIndex >= atr.Length) return 0;
+            double currentAtr = atr[endIndex];
+            
+            int lookback = Math.Min(endIndex + 1, period);
+            if (lookback < 2) return 50.0;
+            
+            int rankCount = 0;
+            int startIdx = endIndex - lookback + 1;
+            for (int i = startIdx; i <= endIndex; i++)
+            {
+                if (currentAtr > atr[i]) rankCount++;
+            }
+            return (rankCount / (double)(lookback - 1)) * 100.0;
+        }
+
+        public double CalculateRollingSharpeAt(double[] closes, int endIndex, int period = 63, double riskFreeRate = 0.0)
+        {
+            if (endIndex < period || closes.Length <= endIndex) return 0;
+
+            double[] returns = new double[period];
+            for (int i = 0; i < period; i++)
+            {
+                int idx = endIndex - period + 1 + i;
+                returns[i] = (closes[idx] - closes[idx - 1]) / closes[idx - 1];
+            }
+
+            double meanReturn = returns.Average();
+            double sumOfSquaresOfDifferences = returns.Select(val => (val - meanReturn) * (val - meanReturn)).Sum();
+            double stdDev = Math.Sqrt(sumOfSquaresOfDifferences / period);
+
+            if (stdDev == 0) return 0;
+
+            return ((meanReturn - (riskFreeRate / 252.0)) / stdDev) * Math.Sqrt(252);
         }
     }
 }
