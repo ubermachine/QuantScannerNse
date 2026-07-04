@@ -33,3 +33,4 @@ out-of-memory.log
 *.ntvs*
 *.njsproj
 *.sln
+strategy_pdf/
