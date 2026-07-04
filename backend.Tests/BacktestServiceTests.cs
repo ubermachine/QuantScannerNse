@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,7 +12,7 @@ namespace backend.Tests
 {
     public class BacktestServiceTests
     {
-        private readonly string _connectionString = "Data Source=quantscanner.duckdb";
+        private readonly string _connectionString = "Data Source=test_quantscanner.duckdb";
 
         private void SetupDatabase()
         {
