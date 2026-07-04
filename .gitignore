@@ -3,6 +3,8 @@ backend/*.db
 backend/*.db-journal
 backend/*.db-wal
 backend/*.db-shm
+backend/*.duckdb
+backend/*.duckdb.wal
 
 # C# / .NET
 [Bb]in/
