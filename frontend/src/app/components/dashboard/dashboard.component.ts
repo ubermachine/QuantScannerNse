@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ScannerService } from '../../services/scanner.service';
 import { ScanResponse, StockScanResult, WatchlistItem, SyncStatus, ChartCandle } from '../../models/scanner.model';
 import { TradingViewChartComponent } from '../tradingview-chart/tradingview-chart.component';
@@ -8,7 +9,7 @@ import { TradingViewChartComponent } from '../tradingview-chart/tradingview-char
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, TradingViewChartComponent],
+  imports: [CommonModule, FormsModule, RouterLink, TradingViewChartComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, OnDestroy {

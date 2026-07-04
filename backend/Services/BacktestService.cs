@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -241,7 +241,8 @@ namespace backend.Services
                         bool match = false;
 
                         // Trend-following strategy (HCT)
-                        if (request.Strategy == "HCT" || request.Strategy == "Both")
+                        bool runHct = request.Strategy == "All" || request.Strategy.Contains("HCT", StringComparison.OrdinalIgnoreCase) || request.Strategy == "Both";
+                        if (runHct)
                         {
                             if (bar.Close > state.Ema200[idx] &&
                                 state.Ema8[idx] > state.Ema21[idx] &&
@@ -263,7 +264,8 @@ namespace backend.Services
                         }
 
                         // Weekly swing reversal strategy (LRHR)
-                        if (!match && (request.Strategy == "LRHR" || request.Strategy == "Both"))
+                        bool runLrhr = request.Strategy == "All" || request.Strategy.Contains("LRHR", StringComparison.OrdinalIgnoreCase) || request.Strategy == "Both";
+                        if (!match && runLrhr)
                         {
                             double max52WHigh = state.DailyBars.Skip(Math.Max(0, idx - 249)).Take(Math.Min(idx + 1, 250)).Max(b => b.High);
                             double discount52W = (max52WHigh - bar.Close) / max52WHigh;

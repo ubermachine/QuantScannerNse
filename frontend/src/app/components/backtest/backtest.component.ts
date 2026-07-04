@@ -37,7 +37,7 @@ export class BacktestComponent implements OnInit {
     positionSizePercent: 10.0,
     transactionCostPercent: 0.05,
     slippagePercent: 0.10,
-    strategy: 'Both',
+    strategy: 'All',
     startDate: '2023-01-01',
     endDate: '2026-07-01'
   };
@@ -61,10 +61,10 @@ export class BacktestComponent implements OnInit {
   singleTrades: any[] = [];
   singleStats: any = null;
 
-  // Bulk Backtest State
+  // Universe Scan Backtest State
   isBulkLoading: boolean = false;
   bulkHasRun: boolean = false;
-  bulkWatchlistResults: any[] = [];
+  bulkUniverseResults: any[] = [];
   bulkSummary: any = null;
 
   constructor(private scannerService: ScannerService) {}
@@ -211,16 +211,21 @@ export class BacktestComponent implements OnInit {
     });
   }
 
-  // BULK BACKTESTER (WATCHLIST WIDE) ACTIONS
+  // UNIVERSE SCAN BULK BACKTESTER ACTIONS
   runBulkBacktest() {
     this.isBulkLoading = true;
     this.bulkHasRun = true;
-    this.bulkWatchlistResults = [];
+    this.bulkUniverseResults = [];
     this.bulkSummary = null;
 
-    this.scannerService.getWatchlist().subscribe({
-      next: (list) => {
-        if (list.length === 0) {
+    // Fetch full scanned universe — NOT just watchlist
+    this.scannerService.scan().subscribe({
+      next: (scanResponse) => {
+        const tickers: string[] = scanResponse.results
+          .map((r: any) => r.ticker as string)
+          .filter((t: string, i: number, arr: string[]) => arr.indexOf(t) === i); // dedupe
+
+        if (tickers.length === 0) {
           this.isBulkLoading = false;
           return;
         }
@@ -228,20 +233,19 @@ export class BacktestComponent implements OnInit {
         let completed = 0;
         const resultsList: any[] = [];
 
-        list.forEach(item => {
-          this.scannerService.getChartData(item.ticker, 500).subscribe({
+        tickers.forEach((ticker: string) => {
+          this.scannerService.getChartData(ticker.replace('.NS', ''), 500).subscribe({
             next: (res) => {
-              const simHct = this.simulateSingleStock(res.candles, 'HCT', item.ticker);
-              const simLrhr = this.simulateSingleStock(res.candles, 'LRHR', item.ticker);
-              
-              const hctWins = simHct.trades.filter(t => t.profit > 0);
-              const hctReturn = simHct.trades.reduce((sum, t) => sum + t.profitPercent, 0);
-              const lrhrWins = simLrhr.trades.filter(t => t.profit > 0);
-              const lrhrReturn = simLrhr.trades.reduce((sum, t) => sum + t.profitPercent, 0);
+              const simHct = this.simulateSingleStock(res.candles, 'HCT', ticker);
+              const simLrhr = this.simulateSingleStock(res.candles, 'LRHR', ticker);
+
+              const hctWins = simHct.trades.filter((t: any) => t.profit > 0);
+              const hctReturn = simHct.trades.reduce((sum: number, t: any) => sum + t.profitPercent, 0);
+              const lrhrWins = simLrhr.trades.filter((t: any) => t.profit > 0);
+              const lrhrReturn = simLrhr.trades.reduce((sum: number, t: any) => sum + t.profitPercent, 0);
 
               resultsList.push({
-                ticker: item.ticker,
-                entryPrice: item.entryPrice,
+                ticker: ticker.replace('.NS', ''),
                 hctTrades: simHct.trades.length,
                 hctWinRate: simHct.trades.length > 0 ? (hctWins.length / simHct.trades.length) * 100 : 0,
                 hctReturn: hctReturn,
@@ -251,14 +255,14 @@ export class BacktestComponent implements OnInit {
               });
 
               completed++;
-              if (completed === list.length) {
+              if (completed === tickers.length) {
                 this.finalizeBulk(resultsList);
               }
             },
             error: (err) => {
-              console.error(`Failed bulk fetch for ${item.ticker}`, err);
+              console.error(`Failed universe bulk fetch for ${ticker}`, err);
               completed++;
-              if (completed === list.length) {
+              if (completed === tickers.length) {
                 this.finalizeBulk(resultsList);
               }
             }
@@ -266,15 +270,15 @@ export class BacktestComponent implements OnInit {
         });
       },
       error: (err) => {
-        console.error('Watchlist fetch failed for bulk backtest', err);
+        console.error('Universe scan fetch failed for bulk backtest', err);
         this.isBulkLoading = false;
       }
     });
   }
 
   private finalizeBulk(results: any[]) {
-    this.bulkWatchlistResults = results;
-    
+    this.bulkUniverseResults = results.sort((a, b) => (b.hctReturn + b.lrhrReturn) - (a.hctReturn + a.lrhrReturn));
+
     const totalHctTrades = results.reduce((sum, r) => sum + r.hctTrades, 0);
     const avgHctReturn = results.length > 0 ? results.reduce((sum, r) => sum + r.hctReturn, 0) / results.length : 0;
     const totalLrhrTrades = results.reduce((sum, r) => sum + r.lrhrTrades, 0);
@@ -285,7 +289,7 @@ export class BacktestComponent implements OnInit {
       avgHctReturn,
       totalLrhrTrades,
       avgLrhrReturn,
-      watchlistSize: results.length
+      universeSize: results.length
     };
     this.isBulkLoading = false;
   }
@@ -362,12 +366,24 @@ export class BacktestComponent implements OnInit {
             }
           }
         } else if (strategy === 'LRHR') {
-          const ema200 = c.ema200 || 0;
+          // LRHR: stock must be 30%+ below 52-week high (deep discount value),
+          // then near a long-term weekly moving average (approximated via ema200 proximity)
           const jnsar = c.jnsar || 0;
 
-          if (ema200 > 0 && c.close > ema200) {
-            const dist = (c.close - ema200) / ema200;
-            if (dist <= 0.04) {
+          // Compute rolling 52-week (252 bars) high up to this candle
+          const lookback = Math.min(252, i);
+          let high52W = 0;
+          for (let k = i - lookback; k <= i; k++) {
+            if (candles[k].high > high52W) high52W = candles[k].high;
+          }
+
+          if (high52W > 0) {
+            const discount = (high52W - c.close) / high52W;
+            // Entry: 30%+ off the 52-week high (deep value), and near EMA200 (within 5%)
+            const ema200 = c.ema200 || 0;
+            const nearEma200 = ema200 > 0 && Math.abs((c.close - ema200) / ema200) <= 0.05;
+
+            if (discount >= 0.30 && nearEma200) {
               isBuy = true;
               target = c.close * 1.25;
               stopLoss = jnsar > 0 ? Math.min(jnsar, c.close * 0.93) : c.close * 0.93;

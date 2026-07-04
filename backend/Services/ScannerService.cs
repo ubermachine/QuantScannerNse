@@ -371,7 +371,8 @@ namespace backend.Services
 
                     foreach (var strategy in _strategies)
                     {
-                        if (!string.IsNullOrEmpty(selectedStrategy) && strategy.Name != selectedStrategy)
+                        if (!string.IsNullOrEmpty(selectedStrategy) && selectedStrategy != "All" &&
+                            !strategy.Name.Contains(selectedStrategy, StringComparison.OrdinalIgnoreCase))
                         {
                             continue;
                         }
@@ -388,7 +389,7 @@ namespace backend.Services
 
                     if (matchedStrategies.Count == 0) strategyName = "None";
                     else if (matchedStrategies.Count == 1) strategyName = matchedStrategies[0];
-                    else strategyName = "Both";
+                    else strategyName = string.Join(" + ", matchedStrategies);
                     
                     // Prop-desk conviction thresholds (tightened from 75/50 to 65/45)
                     string conviction = totalScore >= 65 ? "High" : (totalScore >= 45 ? "Medium" : "Low");
@@ -470,14 +471,10 @@ namespace backend.Services
 
             var results = resultsBag.OrderByDescending(r => r.Score).ToList();
 
-            // Enrich matched HCT or LRHR stocks with Options Flow metrics from FYERS MCP
-            foreach (var result in results)
-            {
-                if (result.IsHctMatch || result.IsLrhrMatch)
-                {
-                    result.FyersOptionsFlow = await _fyersMcpService.QueryOptionsFlowAsync(result.Ticker);
-                }
-            }
+            // NOTE: Fyers Options Flow is NOT fetched here during scan.
+            // Per platform rules, it is fetched on-demand ONLY when the user
+            // explicitly clicks "Populate Options Data" on a specific symbol.
+            // Fetching eagerly here blocks the scan for 8s per matched stock.
 
             response.Results = results;
             return response;

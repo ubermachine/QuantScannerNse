@@ -37,7 +37,7 @@
       <button (click)="changeModeTab('bulk')" 
               class="text-xs font-semibold px-4 py-2 rounded-lg transition" 
               [ngClass]="activeModeTab === 'bulk' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
-        Watchlist Bulk
+        Universe Scan
       </button>
     </div>
   </div>
@@ -54,6 +54,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
           </svg>
           Portfolio Setup
+          <span class="ml-auto text-[9px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-900/50 px-2 py-0.5 rounded-full tracking-wider">FULL NSE UNIVERSE</span>
         </h2>
 
         <!-- Starting Capital -->
@@ -132,14 +133,19 @@
                  class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
         </div>
 
-        <!-- Strategy select -->
         <div class="flex flex-col gap-1.5">
           <span class="text-xs text-slate-400 font-medium">Strategy Filter</span>
           <select [(ngModel)]="request.strategy" 
                   class="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-600 transition">
-            <option value="Both">Both (HCT + LRHR)</option>
-            <option value="HCT">HCT Setup Only</option>
-            <option value="LRHR">LRHR Value Only</option>
+            <option value="All">All Strategies</option>
+            <option value="Both">HCT + LRHR (Both)</option>
+            <option value="HCT">HCT Only (all HCT variants)</option>
+            <option value="LRHR">LRHR Only (all LRHR variants)</option>
+            <option value="JustNifty Positional">JustNifty Positional</option>
+            <option value="Quant HCT Pullback">Quant HCT Pullback</option>
+            <option value="Quant LRHR Base">Quant LRHR Base</option>
+            <option value="JustNifty HCT">JustNifty HCT</option>
+            <option value="JustNifty LRHR">JustNifty LRHR</option>
           </select>
         </div>
 
@@ -544,7 +550,7 @@
       </div>
     </ng-container>
 
-    <!-- MODE 3: WATCHLIST BULK BACKTESTER -->
+    <!-- MODE 3: UNIVERSE SCAN BULK BACKTESTER -->
     <ng-container *ngIf="activeModeTab === 'bulk'">
       <!-- Left Column: Controls (col span 3) -->
       <div class="xl:col-span-3 bg-[#090d16]/60 border border-slate-900 rounded-2xl p-6 shadow-xl flex flex-col gap-5">
@@ -552,11 +558,11 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          Bulk Setup
+          Universe Scan Setup
         </h2>
 
         <p class="text-xs text-slate-400 leading-relaxed">
-          Runs a concurrent historical strategy backtest across all symbols currently saved in your watchlist.
+          Runs a concurrent historical strategy backtest across all <strong class="text-slate-200">currently scanned stocks</strong> in the NSE universe. Results are sorted by combined HCT+LRHR total return.
         </p>
 
         <button (click)="runBulkBacktest()" [disabled]="isBulkLoading" 
@@ -565,7 +571,7 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span>{{ isBulkLoading ? 'Backtesting Watchlist...' : 'Run Watchlist Bulk' }}</span>
+          <span>{{ isBulkLoading ? 'Scanning Universe...' : 'Run Universe Scan' }}</span>
         </button>
       </div>
 
@@ -575,9 +581,9 @@
         <!-- Summary Stats Cards -->
         <div *ngIf="bulkHasRun && bulkSummary" class="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
-            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Watchlist Size</span>
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Universe Size</span>
             <span class="text-xl font-bold font-mono tracking-tight text-slate-200">
-              {{ bulkSummary.watchlistSize }} Stocks
+              {{ bulkSummary.universeSize }} Stocks
             </span>
           </div>
 
@@ -615,7 +621,7 @@
         <!-- Bulk Results Table -->
         <div class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl flex flex-col">
           <div class="bg-slate-950 border-b border-slate-900 px-6 py-4">
-            <span class="text-sm font-bold text-white tracking-wide">Watchlist Performance Summary</span>
+            <span class="text-sm font-bold text-white tracking-wide">Universe Scan Performance Summary</span>
           </div>
 
           <div class="overflow-y-auto max-h-[600px]">
@@ -623,7 +629,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              <span class="text-sm font-medium">Click "Run Watchlist Bulk" to backtest all watchlist stocks.</span>
+              <span class="text-sm font-medium">Click "Run Universe Scan" to backtest all scanned stocks.</span>
             </div>
 
             <div *ngIf="isBulkLoading" class="py-20 flex items-center justify-center bg-[#090d16]/40">
@@ -632,7 +638,7 @@
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span class="text-xs text-slate-400 font-semibold tracking-wider uppercase font-mono">Running bulk strategy math on database nodes...</span>
+                <span class="text-xs text-slate-400 font-semibold tracking-wider uppercase font-mono">Running bulk strategy math on NSE universe...</span>
               </div>
             </div>
 
@@ -640,7 +646,6 @@
               <thead>
                 <tr class="bg-slate-950/40 border-b border-slate-900 text-slate-400 text-xs font-semibold uppercase tracking-wider">
                   <th class="px-5 py-3">Symbol</th>
-                  <th class="px-5 py-3 text-right">Watchlist Price</th>
                   <th class="px-5 py-3 text-center">HCT Trades</th>
                   <th class="px-5 py-3 text-right">HCT Win Rate</th>
                   <th class="px-5 py-3 text-right">HCT Return %</th>
@@ -650,9 +655,8 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-900/60">
-                <tr *ngFor="let res of bulkWatchlistResults" class="hover:bg-slate-900/30 transition text-sm">
+                <tr *ngFor="let res of bulkUniverseResults" class="hover:bg-slate-900/30 transition text-sm">
                   <td class="px-5 py-3 font-bold text-white">{{ res.ticker }}</td>
-                  <td class="px-5 py-3 text-right font-mono text-slate-300">₹{{ res.entryPrice | number:'1.2-2' }}</td>
                   <td class="px-5 py-3 text-center font-mono text-slate-400">{{ res.hctTrades }}</td>
                   <td class="px-5 py-3 text-right font-mono text-blue-400">{{ res.hctWinRate | number:'1.1-1' }}%</td>
                   <td class="px-5 py-3 text-right font-mono font-semibold"
