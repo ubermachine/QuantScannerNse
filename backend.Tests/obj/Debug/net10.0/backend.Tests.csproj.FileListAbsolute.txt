@@ -123,7 +123,6 @@ D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\CoverletSour
 D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\appsettings.Development.json
 D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\appsettings.json
 D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\backend.staticwebassets.endpoints.json
-D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\testhost.exe
 D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\testhost.dll
 D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\xunit.abstractions.dll
 D:\antigravity_sandbox\Quantscanner\backend.Tests\bin\Debug\net10.0\xunit.runner.visualstudio.testadapter.dll

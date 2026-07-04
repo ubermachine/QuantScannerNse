@@ -5,6 +5,7 @@ backend/*.db-wal
 backend/*.db-shm
 backend/*.duckdb
 backend/*.duckdb.wal
+backend/*.pdf
 
 # C# / .NET
 [Bb]in/
