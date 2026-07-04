@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ScanResponse, HistoricalChartResponse, WatchlistItem, SyncStatus } from '../models/scanner.model';
+import { ScanResponse, HistoricalChartResponse, WatchlistItem, SyncStatus, PortfolioRequest, PortfolioSimulationResult } from '../models/scanner.model';
 
 @Injectable({
   providedIn: 'root'
@@ -23,8 +23,13 @@ export class ScannerService {
     return this.http.get<SyncStatus>(`${this.apiUrl}/sync/status`);
   }
 
-  getChartData(ticker: string): Observable<HistoricalChartResponse> {
-    return this.http.get<HistoricalChartResponse>(`${this.apiUrl}/chart/${ticker}`);
+  getChartData(ticker: string, limit?: number): Observable<HistoricalChartResponse> {
+    const url = limit ? `${this.apiUrl}/chart/${ticker}?limit=${limit}` : `${this.apiUrl}/chart/${ticker}`;
+    return this.http.get<HistoricalChartResponse>(url);
+  }
+
+  runPortfolioSimulation(request: PortfolioRequest): Observable<PortfolioSimulationResult> {
+    return this.http.post<PortfolioSimulationResult>(`${this.apiUrl}/backtest/portfolio`, request);
   }
 
   getWatchlist(): Observable<WatchlistItem[]> {

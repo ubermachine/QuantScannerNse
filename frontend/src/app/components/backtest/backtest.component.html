@@ -1,0 +1,676 @@
+<div class="min-h-screen bg-[#080c14] text-slate-100 flex flex-col">
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-900 bg-[#090d16]/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">QUANT SCANNER</h1>
+        <p class="text-xs text-slate-500 font-medium tracking-wider">JUSTNIFTY STRATEGY PLATFORM</p>
+      </div>
+      
+      <!-- Routing Tabs -->
+      <nav class="flex items-center gap-6 ml-8 pl-8 border-l border-slate-900">
+        <a routerLink="/" routerLinkActive="text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="text-sm font-semibold text-slate-400 hover:text-white transition">Dashboard</a>
+        <a routerLink="/backtest" routerLinkActive="text-blue-400" class="text-sm font-semibold text-slate-400 hover:text-white transition">Backtester</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Backtester Mode Switcher Sub-header -->
+  <div class="bg-slate-950/60 border-b border-slate-900/60 px-6 py-3 flex items-center gap-4">
+    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Backtest Mode:</span>
+    <div class="flex bg-slate-900 border border-slate-800/80 p-0.5 rounded-xl">
+      <button (click)="changeModeTab('portfolio')" 
+              class="text-xs font-semibold px-4 py-2 rounded-lg transition" 
+              [ngClass]="activeModeTab === 'portfolio' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+        Portfolio Simulator
+      </button>
+      <button (click)="changeModeTab('single')" 
+              class="text-xs font-semibold px-4 py-2 rounded-lg transition" 
+              [ngClass]="activeModeTab === 'single' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+        Single Stock
+      </button>
+      <button (click)="changeModeTab('bulk')" 
+              class="text-xs font-semibold px-4 py-2 rounded-lg transition" 
+              [ngClass]="activeModeTab === 'bulk' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'">
+        Watchlist Bulk
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="flex-1 p-6 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start overflow-hidden">
+    
+    <!-- MODE 1: PORTFOLIO SIMULATOR -->
+    <ng-container *ngIf="activeModeTab === 'portfolio'">
+      <!-- Left Column: Controls (col span 3) -->
+      <div class="xl:col-span-3 bg-[#090d16]/60 border border-slate-900 rounded-2xl p-6 shadow-xl flex flex-col gap-5">
+        <h2 class="text-sm font-bold tracking-wide text-white border-b border-slate-900 pb-3 flex items-center gap-2 uppercase">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          Portfolio Setup
+        </h2>
+
+        <!-- Starting Capital -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Starting Capital</span>
+            <span class="text-blue-400 font-mono font-bold">₹{{ request.startingCapital | number }}</span>
+          </div>
+          <input type="range" min="100000" max="10000000" step="100000" 
+                 [(ngModel)]="request.startingCapital" 
+                 class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+        </div>
+
+        <!-- Max Concurrent Positions -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Max Active Positions</span>
+            <span class="text-blue-400 font-mono font-bold">{{ request.maxPositions }}</span>
+          </div>
+          <input type="range" min="1" max="30" step="1" 
+                 [(ngModel)]="request.maxPositions" 
+                 class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+        </div>
+
+        <!-- Sizing Model -->
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs text-slate-400 font-medium">Position Sizing Model</span>
+          <select [(ngModel)]="request.sizingModel" 
+                  class="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-600 transition">
+            <option value="Equal">Equal Allocation</option>
+            <option value="Risk-Based">Risk-Based Allocation</option>
+          </select>
+        </div>
+
+        <!-- Position Size % (Only for Equal Allocation) -->
+        <div *ngIf="request.sizingModel === 'Equal'" class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Capital Per Trade</span>
+            <span class="text-blue-400 font-mono font-bold">{{ request.positionSizePercent }}%</span>
+          </div>
+          <input type="range" min="1" max="100" step="1" 
+                 [(ngModel)]="request.positionSizePercent" 
+                 class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+        </div>
+
+        <!-- Risk Per Trade % (Only for Risk-Based Allocation) -->
+        <div *ngIf="request.sizingModel === 'Risk-Based'" class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Risk Per Trade</span>
+            <span class="text-blue-400 font-mono font-bold">{{ request.riskPerTradePercent }}%</span>
+          </div>
+          <input type="range" min="0.1" max="5.0" step="0.1" 
+                 [(ngModel)]="request.riskPerTradePercent" 
+                 class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+        </div>
+
+        <!-- Slippage % -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Slippage Per Trade</span>
+            <span class="text-blue-400 font-mono font-bold">{{ request.slippagePercent }}%</span>
+          </div>
+          <input type="range" min="0.0" max="0.5" step="0.05" 
+                 [(ngModel)]="request.slippagePercent" 
+                 class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+        </div>
+
+        <!-- Transaction Cost % -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Transaction Cost</span>
+            <span class="text-blue-400 font-mono font-bold">{{ request.transactionCostPercent }}%</span>
+          </div>
+          <input type="range" min="0.0" max="0.3" step="0.01" 
+                 [(ngModel)]="request.transactionCostPercent" 
+                 class="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+        </div>
+
+        <!-- Strategy select -->
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs text-slate-400 font-medium">Strategy Filter</span>
+          <select [(ngModel)]="request.strategy" 
+                  class="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-600 transition">
+            <option value="Both">Both (HCT + LRHR)</option>
+            <option value="HCT">HCT Setup Only</option>
+            <option value="LRHR">LRHR Value Only</option>
+          </select>
+        </div>
+
+        <!-- Start Date / End Date -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1">
+            <span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Start Date</span>
+            <input type="date" [(ngModel)]="request.startDate" 
+                   class="w-full bg-slate-950 border border-slate-900 rounded-xl px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-600 transition" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">End Date</span>
+            <input type="date" [(ngModel)]="request.endDate" 
+                   class="w-full bg-slate-950 border border-slate-900 rounded-xl px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-600 transition" />
+          </div>
+        </div>
+
+        <!-- Run Simulation Button -->
+        <button (click)="runSimulation()" [disabled]="isLoading" 
+                class="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10">
+          <svg *ngIf="isLoading" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>{{ isLoading ? 'Running Simulation...' : 'Run Simulation' }}</span>
+        </button>
+      </div>
+
+      <!-- Right Column: Results & Charts (col span 9) -->
+      <div class="xl:col-span-9 flex flex-col gap-6">
+        
+        <!-- Stats Cards -->
+        <div *ngIf="hasRun && results" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <!-- Return Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Net Return</span>
+            <span class="text-xl font-bold font-mono tracking-tight"
+                  [ngClass]="results.returnPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ results.returnPercent >= 0 ? '+' : '' }}{{ results.returnPercent | number:'1.2-2' }}%
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono">Profit: ₹{{ results.totalProfit | number }}</span>
+          </div>
+
+          <!-- Sharpe Ratio Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Sharpe Ratio</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-indigo-400">
+              {{ results.sharpeRatio | number:'1.2-2' }}
+            </span>
+            <span class="text-[10px] text-slate-500">Risk-adjusted return</span>
+          </div>
+
+          <!-- Max Drawdown Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Max Drawdown</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-rose-400">
+              -{{ results.maxDrawdownPercent | number:'1.2-2' }}%
+            </span>
+            <span class="text-[10px] text-slate-500">Peak-to-valley loss</span>
+          </div>
+
+          <!-- Profit Factor Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Profit Factor</span>
+            <span class="text-xl font-bold font-mono tracking-tight"
+                  [ngClass]="results.profitFactor >= 1.0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ results.profitFactor | number:'1.2-2' }}
+            </span>
+            <span class="text-[10px] text-slate-500">Gross win / Gross loss</span>
+          </div>
+
+          <!-- Win Rate Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Win Rate</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-blue-400">
+              {{ results.winRate | number:'1.1-1' }}%
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono">Trades: {{ results.winningTrades }}W / {{ results.losingTrades }}L</span>
+          </div>
+        </div>
+
+        <!-- Visualization Panel -->
+        <div class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+          <div class="bg-slate-950 border-b border-slate-900 px-6 py-3.5 flex items-center justify-between">
+            <div class="flex bg-slate-900/60 p-0.5 rounded-lg border border-slate-800/80">
+              <button (click)="setChartTab('portfolio')" 
+                      class="text-xs font-semibold px-4 py-1.5 rounded-md transition" 
+                      [disabled]="!hasRun"
+                      [ngClass]="activeChartTab === 'portfolio' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 disabled:opacity-50'">
+                Portfolio Equity Curve
+              </button>
+              <button (click)="setChartTab('stock')" 
+                      class="text-xs font-semibold px-4 py-1.5 rounded-md transition" 
+                      [disabled]="!selectedTrade"
+                      [ngClass]="activeChartTab === 'stock' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 disabled:opacity-50'">
+                Single Stock: {{ stockChartTicker || 'Select a Trade' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Chart Area -->
+          <div class="p-6 bg-slate-950/40 relative">
+            <div *ngIf="!hasRun" class="h-[400px] border border-slate-900 rounded-xl bg-[#090d16]/40 flex flex-col items-center justify-center text-slate-500 gap-3 border-dashed">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span class="text-sm font-medium">Configure portfolio parameters and click "Run Simulation"</span>
+            </div>
+
+            <div *ngIf="isLoading" class="h-[400px] flex items-center justify-center bg-[#090d16]/40 rounded-xl">
+              <div class="flex flex-col items-center gap-3">
+                <svg class="animate-spin h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-xs text-slate-400 font-semibold tracking-wider uppercase font-mono">Running chronological simulation ledger...</span>
+              </div>
+            </div>
+
+            <!-- Portfolio curve chart -->
+            <div *ngIf="hasRun && !isLoading && activeChartTab === 'portfolio'">
+              <app-tradingview-chart 
+                [data]="equityChartData" 
+                chartMode="equity" 
+                ticker="PORTFOLIO">
+              </app-tradingview-chart>
+            </div>
+
+            <!-- Stock marker chart -->
+            <div *ngIf="hasRun && !isLoading && activeChartTab === 'stock'">
+              <div *ngIf="stockChartData.length === 0" class="h-[400px] flex items-center justify-center text-slate-500">
+                <span>Loading trade candles for {{ stockChartTicker }}...</span>
+              </div>
+              <div *ngIf="stockChartData.length > 0">
+                <app-tradingview-chart 
+                  [data]="stockChartData" 
+                  [markers]="stockMarkers" 
+                  chartMode="candlestick" 
+                  [ticker]="stockChartTicker">
+                </app-tradingview-chart>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Executed Trades Table -->
+        <div *ngIf="hasRun && results" class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl flex flex-col max-h-[400px]">
+          <div class="bg-slate-950 border-b border-slate-900 px-6 py-4 flex items-center justify-between">
+            <span class="text-sm font-bold text-white tracking-wide">Executed Strategy Trades ({{ results.trades.length }})</span>
+            <span class="text-xs text-slate-500">Click a trade row to inspect entry/exit on chart</span>
+          </div>
+
+          <div class="overflow-y-auto flex-1">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-950/40 border-b border-slate-900 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  <th class="px-5 py-3.5">Symbol</th>
+                  <th class="px-5 py-3.5">Entry Date / Price</th>
+                  <th class="px-5 py-3.5">Exit Date / Price</th>
+                  <th class="px-5 py-3.5 text-right">Shares</th>
+                  <th class="px-5 py-3.5 text-right">Profit</th>
+                  <th class="px-5 py-3.5 text-right">Return %</th>
+                  <th class="px-5 py-3.5">Exit Reason</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-900/60">
+                <tr *ngFor="let trade of results.trades" 
+                    (click)="selectTrade(trade)"
+                    class="hover:bg-slate-900/30 cursor-pointer transition relative group"
+                    [ngClass]="selectedTrade === trade ? 'bg-blue-950/15 border-l-2 border-l-blue-500' : ''">
+                  
+                  <td class="px-5 py-3 font-bold text-sm tracking-wide text-white group-hover:text-blue-400 transition">
+                    {{ trade.ticker }}
+                  </td>
+
+                  <td class="px-5 py-3 text-xs text-slate-300">
+                    <div class="flex flex-col">
+                      <span class="font-mono text-slate-400">{{ trade.entryDate | date:'yyyy-MM-dd' }}</span>
+                      <span class="font-semibold text-slate-200">₹{{ trade.entryPrice | number:'1.2-2' }}</span>
+                    </div>
+                  </td>
+
+                  <td class="px-5 py-3 text-xs text-slate-300">
+                    <div class="flex flex-col">
+                      <span class="font-mono text-slate-400">{{ trade.exitDate | date:'yyyy-MM-dd' }}</span>
+                      <span class="font-semibold text-slate-200">₹{{ trade.exitPrice | number:'1.2-2' }}</span>
+                    </div>
+                  </td>
+
+                  <td class="px-5 py-3 text-right font-mono text-sm text-slate-400">
+                    {{ trade.shares }}
+                  </td>
+
+                  <td class="px-5 py-3 text-right font-mono font-semibold"
+                      [ngClass]="trade.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    ₹{{ trade.profit | number:'1.2-2' }}
+                  </td>
+
+                  <td class="px-5 py-3 text-right font-mono font-semibold"
+                      [ngClass]="trade.profitPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    {{ trade.profitPercent >= 0 ? '+' : '' }}{{ trade.profitPercent | number:'1.2-2' }}%
+                  </td>
+
+                  <td class="px-5 py-3 text-xs font-medium text-slate-400">
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold"
+                          [ngClass]="trade.exitReason === 'Stop Loss' ? 'bg-rose-950/40 text-rose-400 border border-rose-900/50' : 
+                                     trade.exitReason.startsWith('Target') ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/50' : 
+                                     'bg-slate-900 text-slate-400 border border-slate-800'">
+                      {{ trade.exitReason }}
+                    </span>
+                  </td>
+                </tr>
+                <tr *ngIf="results.trades.length === 0">
+                  <td colspan="7" class="px-5 py-8 text-center text-slate-500 text-sm">
+                    No trades executed during this simulation period.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- MODE 2: SINGLE STOCK BACKTESTER -->
+    <ng-container *ngIf="activeModeTab === 'single'">
+      <!-- Left Column: Setup (col span 3) -->
+      <div class="xl:col-span-3 bg-[#090d16]/60 border border-slate-900 rounded-2xl p-6 shadow-xl flex flex-col gap-5">
+        <h2 class="text-sm font-bold tracking-wide text-white border-b border-slate-900 pb-3 flex items-center gap-2 uppercase">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Single Stock Setup
+        </h2>
+
+        <!-- Ticker Input -->
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs text-slate-400 font-medium">Stock Symbol (NSE)</span>
+          <input type="text" [(ngModel)]="singleTicker" 
+                 placeholder="e.g. INFY, Reliance, SBIN" 
+                 class="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-600 transition uppercase" />
+        </div>
+
+        <!-- Strategy select -->
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs text-slate-400 font-medium">Strategy Trigger</span>
+          <select [(ngModel)]="singleStrategy" 
+                  class="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-600 transition">
+            <option value="HCT">HCT Trend Pullback</option>
+            <option value="LRHR">LRHR Weekly Rebound</option>
+          </select>
+        </div>
+
+        <!-- Run Backtest Button -->
+        <button (click)="runSingleBacktest()" [disabled]="isSingleLoading" 
+                class="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10">
+          <svg *ngIf="isSingleLoading" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>{{ isSingleLoading ? 'Running Backtest...' : 'Run Single Backtest' }}</span>
+        </button>
+      </div>
+
+      <!-- Right Column: Results & Charts (col span 9) -->
+      <div class="xl:col-span-9 flex flex-col gap-6">
+        
+        <!-- Stats Cards -->
+        <div *ngIf="singleHasRun && singleStats" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <!-- Return Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Sum of Returns</span>
+            <span class="text-xl font-bold font-mono tracking-tight"
+                  [ngClass]="singleStats.returnPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ singleStats.returnPercent >= 0 ? '+' : '' }}{{ singleStats.returnPercent | number:'1.2-2' }}%
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono">Profit: ₹{{ singleStats.totalProfit | number }}</span>
+          </div>
+
+          <!-- Win Rate Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Win Rate</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-blue-400">
+              {{ singleStats.winRate | number:'1.1-1' }}%
+            </span>
+            <span class="text-[10px] text-slate-500">Wins: {{ singleStats.winningTrades }} / Losses: {{ singleStats.losingTrades }}</span>
+          </div>
+
+          <!-- Profit Factor Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Profit Factor</span>
+            <span class="text-xl font-bold font-mono tracking-tight font-semibold"
+                  [ngClass]="singleStats.profitFactor >= 1.0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ singleStats.profitFactor | number:'1.2-2' }}
+            </span>
+            <span class="text-[10px] text-slate-500">Risk benchmark</span>
+          </div>
+
+          <!-- Total Trades Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Total Trades</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-slate-200">
+              {{ singleStats.totalTrades }}
+            </span>
+            <span class="text-[10px] text-slate-500">Executed Signals</span>
+          </div>
+
+          <!-- Ticker Details Card -->
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Ticker</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-indigo-400">
+              {{ singleTicker.toUpperCase() }}
+            </span>
+            <span class="text-[10px] text-slate-500 font-bold uppercase">{{ singleStrategy }} Strategy</span>
+          </div>
+        </div>
+
+        <!-- Chart Visualization -->
+        <div class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+          <div class="bg-slate-950 border-b border-slate-900 px-6 py-3.5 flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-300">Technical Indicators and Trade Markers</span>
+            <span class="text-xs font-bold text-slate-500 uppercase">Interactive Trade Chart</span>
+          </div>
+
+          <div class="p-6 bg-slate-950/40 relative">
+            <div *ngIf="!singleHasRun" class="h-[400px] border border-slate-900 rounded-xl bg-[#090d16]/40 flex flex-col items-center justify-center text-slate-500 gap-3 border-dashed">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <span class="text-sm font-medium">Input a symbol and click "Run Single Backtest" to view chart markers.</span>
+            </div>
+
+            <div *ngIf="isSingleLoading" class="h-[400px] flex items-center justify-center bg-[#090d16]/40 rounded-xl">
+              <div class="flex flex-col items-center gap-3">
+                <svg class="animate-spin h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-xs text-slate-400 font-semibold tracking-wider uppercase font-mono">Simulating {{ singleTicker }} historical signal log...</span>
+              </div>
+            </div>
+
+            <div *ngIf="singleHasRun && !isSingleLoading">
+              <app-tradingview-chart 
+                [data]="singleChartData" 
+                [markers]="singleMarkers" 
+                chartMode="candlestick" 
+                [ticker]="singleTicker.toUpperCase()">
+              </app-tradingview-chart>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single Stock Trades Table -->
+        <div *ngIf="singleHasRun && singleTrades.length > 0" class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl flex flex-col max-h-[350px]">
+          <div class="bg-slate-950 border-b border-slate-900 px-6 py-4">
+            <span class="text-sm font-bold text-white tracking-wide">Executed Signal History</span>
+          </div>
+
+          <div class="overflow-y-auto flex-1">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-950/40 border-b border-slate-900 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  <th class="px-5 py-3">Entry Date / Price</th>
+                  <th class="px-5 py-3">Exit Date / Price</th>
+                  <th class="px-5 py-3 text-right">Shares</th>
+                  <th class="px-5 py-3 text-right">Profit</th>
+                  <th class="px-5 py-3 text-right">Return %</th>
+                  <th class="px-5 py-3">Exit Reason</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-900/60">
+                <tr *ngFor="let trade of singleTrades" class="hover:bg-slate-900/30 transition text-sm">
+                  <td class="px-5 py-2.5 font-mono text-xs text-slate-300">
+                    {{ trade.entryDate | date:'yyyy-MM-dd' }} <span class="text-slate-500 font-semibold ml-2">₹{{ trade.entryPrice | number:'1.2-2' }}</span>
+                  </td>
+                  <td class="px-5 py-2.5 font-mono text-xs text-slate-300">
+                    {{ trade.exitDate | date:'yyyy-MM-dd' }} <span class="text-slate-500 font-semibold ml-2">₹{{ trade.exitPrice | number:'1.2-2' }}</span>
+                  </td>
+                  <td class="px-5 py-2.5 text-right font-mono text-slate-400">
+                    {{ trade.shares }}
+                  </td>
+                  <td class="px-5 py-2.5 text-right font-mono font-semibold"
+                      [ngClass]="trade.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    ₹{{ trade.profit | number:'1.2-2' }}
+                  </td>
+                  <td class="px-5 py-2.5 text-right font-mono font-semibold"
+                      [ngClass]="trade.profitPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    {{ trade.profitPercent >= 0 ? '+' : '' }}{{ trade.profitPercent | number:'1.2-2' }}%
+                  </td>
+                  <td class="px-5 py-2.5 text-xs font-semibold text-slate-400">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                          [ngClass]="trade.exitReason === 'Stop Loss' ? 'bg-rose-950/40 text-rose-400 border border-rose-900/50' : 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/50'">
+                      {{ trade.exitReason }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- MODE 3: WATCHLIST BULK BACKTESTER -->
+    <ng-container *ngIf="activeModeTab === 'bulk'">
+      <!-- Left Column: Controls (col span 3) -->
+      <div class="xl:col-span-3 bg-[#090d16]/60 border border-slate-900 rounded-2xl p-6 shadow-xl flex flex-col gap-5">
+        <h2 class="text-sm font-bold tracking-wide text-white border-b border-slate-900 pb-3 flex items-center gap-2 uppercase">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          Bulk Setup
+        </h2>
+
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Runs a concurrent historical strategy backtest across all symbols currently saved in your watchlist.
+        </p>
+
+        <button (click)="runBulkBacktest()" [disabled]="isBulkLoading" 
+                class="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10">
+          <svg *ngIf="isBulkLoading" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>{{ isBulkLoading ? 'Backtesting Watchlist...' : 'Run Watchlist Bulk' }}</span>
+        </button>
+      </div>
+
+      <!-- Right Column: Results & Tables (col span 9) -->
+      <div class="xl:col-span-9 flex flex-col gap-6">
+        
+        <!-- Summary Stats Cards -->
+        <div *ngIf="bulkHasRun && bulkSummary" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Watchlist Size</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-slate-200">
+              {{ bulkSummary.watchlistSize }} Stocks
+            </span>
+          </div>
+
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">HCT Signals</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-blue-400">
+              {{ bulkSummary.totalHctTrades }} Trades
+            </span>
+          </div>
+
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Avg HCT Return</span>
+            <span class="text-xl font-bold font-mono tracking-tight"
+                  [ngClass]="bulkSummary.avgHctReturn >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ bulkSummary.avgHctReturn >= 0 ? '+' : '' }}{{ bulkSummary.avgHctReturn | number:'1.2-2' }}%
+            </span>
+          </div>
+
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">LRHR Signals</span>
+            <span class="text-xl font-bold font-mono tracking-tight text-blue-400">
+              {{ bulkSummary.totalLrhrTrades }} Trades
+            </span>
+          </div>
+
+          <div class="bg-[#090d16]/60 border border-slate-900 rounded-2xl p-4 flex flex-col gap-1 shadow-md">
+            <span class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Avg LRHR Return</span>
+            <span class="text-xl font-bold font-mono tracking-tight"
+                  [ngClass]="bulkSummary.avgLrhrReturn >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ bulkSummary.avgLrhrReturn >= 0 ? '+' : '' }}{{ bulkSummary.avgLrhrReturn | number:'1.2-2' }}%
+            </span>
+          </div>
+        </div>
+
+        <!-- Bulk Results Table -->
+        <div class="bg-[#090d16]/40 border border-slate-900 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+          <div class="bg-slate-950 border-b border-slate-900 px-6 py-4">
+            <span class="text-sm font-bold text-white tracking-wide">Watchlist Performance Summary</span>
+          </div>
+
+          <div class="overflow-y-auto max-h-[600px]">
+            <div *ngIf="!bulkHasRun" class="px-6 py-20 flex flex-col items-center justify-center text-slate-500 gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span class="text-sm font-medium">Click "Run Watchlist Bulk" to backtest all watchlist stocks.</span>
+            </div>
+
+            <div *ngIf="isBulkLoading" class="py-20 flex items-center justify-center bg-[#090d16]/40">
+              <div class="flex flex-col items-center gap-3">
+                <svg class="animate-spin h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-xs text-slate-400 font-semibold tracking-wider uppercase font-mono">Running bulk strategy math on database nodes...</span>
+              </div>
+            </div>
+
+            <table *ngIf="bulkHasRun && !isBulkLoading" class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-950/40 border-b border-slate-900 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  <th class="px-5 py-3">Symbol</th>
+                  <th class="px-5 py-3 text-right">Watchlist Price</th>
+                  <th class="px-5 py-3 text-center">HCT Trades</th>
+                  <th class="px-5 py-3 text-right">HCT Win Rate</th>
+                  <th class="px-5 py-3 text-right">HCT Return %</th>
+                  <th class="px-5 py-3 text-center">LRHR Trades</th>
+                  <th class="px-5 py-3 text-right">LRHR Win Rate</th>
+                  <th class="px-5 py-3 text-right">LRHR Return %</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-900/60">
+                <tr *ngFor="let res of bulkWatchlistResults" class="hover:bg-slate-900/30 transition text-sm">
+                  <td class="px-5 py-3 font-bold text-white">{{ res.ticker }}</td>
+                  <td class="px-5 py-3 text-right font-mono text-slate-300">₹{{ res.entryPrice | number:'1.2-2' }}</td>
+                  <td class="px-5 py-3 text-center font-mono text-slate-400">{{ res.hctTrades }}</td>
+                  <td class="px-5 py-3 text-right font-mono text-blue-400">{{ res.hctWinRate | number:'1.1-1' }}%</td>
+                  <td class="px-5 py-3 text-right font-mono font-semibold"
+                      [ngClass]="res.hctReturn >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    {{ res.hctReturn >= 0 ? '+' : '' }}{{ res.hctReturn | number:'1.2-2' }}%
+                  </td>
+                  <td class="px-5 py-3 text-center font-mono text-slate-400">{{ res.lrhrTrades }}</td>
+                  <td class="px-5 py-3 text-right font-mono text-blue-400">{{ res.lrhrWinRate | number:'1.1-1' }}%</td>
+                  <td class="px-5 py-3 text-right font-mono font-semibold"
+                      [ngClass]="res.lrhrReturn >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    {{ res.lrhrReturn >= 0 ? '+' : '' }}{{ res.lrhrReturn | number:'1.2-2' }}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </main>
+</div>

@@ -100,3 +100,50 @@ export interface SyncStatus {
   progressPercent: number;
   message: string;
 }
+
+export interface PortfolioRequest {
+  startingCapital: number;
+  maxPositions: number;
+  sizingModel: string;
+  riskPerTradePercent: number;
+  positionSizePercent: number;
+  transactionCostPercent: number;
+  slippagePercent: number;
+  strategy: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface PortfolioTrade {
+  ticker: string;
+  entryDate: string;
+  entryPrice: number;
+  exitDate: string;
+  exitPrice: number;
+  shares: number;
+  profit: number;
+  profitPercent: number;
+  exitReason: string;
+}
+
+export interface EquityCurvePoint {
+  date: string;
+  balance: number;
+  drawdownPercent: number;
+}
+
+export interface PortfolioSimulationResult {
+  startingCapital: number;
+  endingCapital: number;
+  totalProfit: number;
+  returnPercent: number;
+  sharpeRatio: number;
+  maxDrawdownPercent: number;
+  profitFactor: number;
+  winRate: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  trades: PortfolioTrade[];
+  equityCurve: EquityCurvePoint[];
+}
