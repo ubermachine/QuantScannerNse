@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -148,7 +148,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("chart/{ticker}")]
-        public async Task<ActionResult<HistoricalChartResponse>> GetChartData(string ticker)
+        public async Task<ActionResult<HistoricalChartResponse>> GetChartData(string ticker, [FromQuery] int limit = 150)
         {
             try
             {
@@ -178,7 +178,7 @@ namespace backend.Controllers
                 };
 
                 // Limit return to last 150 candles for the charts
-                int countToTake = Math.Min(bars.Count, 150);
+                int countToTake = limit > 0 ? Math.Min(bars.Count, limit) : bars.Count;
                 int startIndex = bars.Count - countToTake;
 
                 double SafeRound(double value, int decimals)
@@ -259,3 +259,4 @@ namespace backend.Controllers
         }
     }
 }
+

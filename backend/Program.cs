@@ -1,4 +1,4 @@
-using DuckDB.NET.Data;
+﻿using DuckDB.NET.Data;
 using Dapper;
 using backend.Models;
 using backend.Services;
@@ -15,6 +15,7 @@ builder.Services.AddHttpClient<YahooFinanceService>();
 builder.Services.AddScoped<IndicatorService>();
 builder.Services.AddSingleton<FyersMcpService>();
 builder.Services.AddScoped<ScannerService>();
+builder.Services.AddScoped<BacktestService>();
 
 // Enable CORS for Angular frontend
 builder.Services.AddCors(options =>
@@ -234,3 +235,4 @@ using (var connection = new DuckDBConnection("Data Source=quantscanner.duckdb"))
 }
 
 app.Run();
+
